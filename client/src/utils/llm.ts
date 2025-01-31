@@ -11,9 +11,9 @@ async function streamCompletion(
   onContent: (delta: string) => void,
   onError: (error: string) => void
 ): Promise<void> {
-  const resp = await fetch("http://localhost:8765/stream", {
+  const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/stream`, {
     method: "POST",
-    headers: { Authorization: "Bearer dev" },
+    headers: { Authorization: `Bearer ${import.meta.env.VITE_API_KEY}` },
     body: JSON.stringify({
       model_id: modelId,
       model_personality_id: personalityId,
