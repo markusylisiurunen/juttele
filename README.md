@@ -1,5 +1,7 @@
 # Juttele
 
+Juttele is my take on a simple LLM chat client for macOS, born out of frustration with Raycast's limitations. It's a tiny self-hostable proxy server that lets you chat with various AI models (Claude, Gemini, etc.) through a clean native interface. Built primarily for personal use, but feel free to try it out if you're looking for a lightweight alternative!
+
 ![Juttele application demo](demo.png)
 
 ```go
