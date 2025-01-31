@@ -1,5 +1,7 @@
 # Juttele
 
+![Juttele application demo](demo.png)
+
 ```go
 package main
 
