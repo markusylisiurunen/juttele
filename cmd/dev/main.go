@@ -32,7 +32,7 @@ func main() {
 			juttele.WithGoogleModelPersonality("Neutral", neutralSystemPrompt),
 		)
 	)
-	app := juttele.New("dev",
+	app := juttele.New("YOUR_TOKEN_HERE",
 		juttele.WithModel(claude35Sonnet),
 		juttele.WithModel(deepseekR1Llama70b),
 		juttele.WithModel(gemini20FlashThinking),
