@@ -1,0 +1,7 @@
+:root {
+  --color-bg: lch(4.2% 0 0);
+  --color-border-focus: lch(88% 108 28);
+  --color-text-link: lch(88% 108 28);
+  --color-text: lch(100% 0 0);
+  --spacing-padding-x: 16px;
+}

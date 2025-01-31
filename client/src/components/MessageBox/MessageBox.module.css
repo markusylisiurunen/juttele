@@ -1,0 +1,59 @@
+.root {
+  --message-box-footer-color-bg: color-mix(in srgb, var(--color-text) 3%, transparent);
+  --message-box-footer-color-border: color-mix(in srgb, var(--color-text) 4%, transparent);
+  --message-box-textarea-color-bg: color-mix(in srgb, var(--color-text) 3%, transparent);
+  --message-box-textarea-color-border: color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+.root {
+  background: var(--color-bg);
+}
+/* main area */
+.main {
+  padding-block-end: 8px;
+  padding-block-start: 8px;
+  padding-inline: var(--spacing-padding-x);
+}
+.main textarea {
+  appearance: none;
+  background: var(--message-box-textarea-color-bg);
+  border-radius: 8px;
+  border: 1px solid var(--message-box-textarea-color-border);
+  color: inherit;
+  display: block;
+  font-size: inherit;
+  height: calc(2 * (10px + 1px) + 3em);
+  line-height: inherit;
+  outline: none;
+  padding-block: 10px;
+  padding-inline: 12px;
+  resize: none;
+  width: 100%;
+}
+.main textarea:focus-visible {
+  border-color: var(--color-border-focus);
+}
+/* footer area */
+.footer {
+  align-items: center;
+  background: var(--message-box-footer-color-bg);
+  border-top: 1px solid var(--message-box-footer-color-border);
+  display: flex;
+  gap: 8px;
+  padding-block: 8px;
+  padding-inline: var(--spacing-padding-x);
+}
+.footer button {
+  appearance: none;
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  border-radius: 4px;
+  border: 1px solid transparent;
+  display: block;
+  font-size: 14px;
+  outline: none;
+  padding-block: 2px;
+  padding-inline: 6px;
+}
+.footer button:hover {
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  border-color: color-mix(in srgb, var(--color-text) 4%, transparent);
+}
