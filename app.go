@@ -68,7 +68,7 @@ func (app *App) ListenAndServe(ctx context.Context) error {
 	// start server
 	server := &http.Server{
 		Addr:    "0.0.0.0:8765",
-		Handler: app.mux,
+		Handler: app.corsMiddleware(app.mux),
 	}
 	go func() {
 		<-ctx.Done()
@@ -98,10 +98,8 @@ func (app *App) mountRoutes() error {
 	}
 	for _, m := range mountables {
 		app.mux.Handle(m.pattern,
-			app.corsMiddleware(
-				app.authMiddleware(
-					m.handler,
-				),
+			app.authMiddleware(
+				m.handler,
 			),
 		)
 	}
