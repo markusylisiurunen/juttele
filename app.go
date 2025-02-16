@@ -2,12 +2,17 @@ package juttele
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/markusylisiurunen/juttele/internal/db"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type App struct {
+	db     *db.DB
 	token  string
 	models []Model
 	mux    *http.ServeMux
@@ -26,8 +31,6 @@ func New(token string, opts ...option) *App {
 	app.token = token
 	app.models = make([]Model, 0)
 	app.mux = http.NewServeMux()
-	app.mux.Handle("/models", app.corsMiddleware(app.authMiddleware(app.handleModelsRoute)))
-	app.mux.Handle("/stream", app.corsMiddleware(app.authMiddleware(app.handleStreamRoute)))
 	for _, opt := range opts {
 		opt(app)
 	}
@@ -35,12 +38,24 @@ func New(token string, opts ...option) *App {
 }
 
 func (app *App) ListenAndServe(ctx context.Context) error {
+	// init database
+	if err := app.initDatabase(ctx); err != nil {
+		return err
+	}
+	// run migrations
+	if err := db.Migrate(ctx, app.db.DB); err != nil {
+		return err
+	}
 	// validate models
 	for _, model := range app.models {
 		info := model.GetModelInfo()
 		if len(info.Personalities) == 0 {
 			return fmt.Errorf("model %q has no personalities", info.ID)
 		}
+	}
+	// mount routes
+	if err := app.mountRoutes(); err != nil {
+		return err
 	}
 	// start server
 	server := &http.Server{
@@ -52,6 +67,31 @@ func (app *App) ListenAndServe(ctx context.Context) error {
 		server.Shutdown(ctx)
 	}()
 	return server.ListenAndServe()
+}
+
+func (app *App) initDatabase(ctx context.Context) error {
+	client, err := sql.Open("sqlite3", ".data/dev.db")
+	if err != nil {
+		return err
+	}
+	app.db = db.New(client)
+	return nil
+}
+
+func (app *App) mountRoutes() error {
+	type mountable struct {
+		pattern string
+		handler http.HandlerFunc
+	}
+	mountables := []mountable{
+		{"GET /models", app.handleModelsRoute},
+		{"GET /chats/{id}", app.handleChatRoute},
+		{"POST /stream", app.handleStreamRoute},
+	}
+	for _, m := range mountables {
+		app.mux.Handle(m.pattern, m.handler)
+	}
+	return nil
 }
 
 func (app *App) corsMiddleware(next http.Handler) http.Handler {

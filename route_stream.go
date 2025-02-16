@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
+	"time"
+
+	"github.com/markusylisiurunen/juttele/internal/db"
 )
 
 func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +79,10 @@ func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.WriteHeader(http.StatusOK)
 	// stream the completion
+	var (
+		reasoning  strings.Builder
+		completion strings.Builder
+	)
 	chunks := model.StreamCompletion(r.Context(), history)
 	for i := range chunks {
 		if i == nil {
@@ -88,16 +96,76 @@ func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if chunk.t == thinkingChunkType {
+			reasoning.WriteString(chunk.thinking)
 			data := map[string]string{"thinking": chunk.thinking}
 			fmt.Fprintf(w, "data: %s\n\n", must(json.Marshal(data)))
 			flusher.Flush()
 			continue
 		}
 		if chunk.t == contentChunkType {
+			completion.WriteString(chunk.content)
 			data := map[string]string{"content": chunk.content}
 			fmt.Fprintf(w, "data: %s\n\n", must(json.Marshal(data)))
 			flusher.Flush()
 			continue
+		}
+	}
+	// FIXME: this should definitely not be here
+	ctx := r.Context()
+	chatID, err := app.db.CreateChat(ctx, db.CreateChatArgs{
+		Title: time.Now().UTC().Format("2006-01-02 15:04:05"),
+	})
+	if err != nil {
+		fmt.Printf("error creating chat: %v\n", err)
+		return
+	}
+	// append events from the conversation history
+	for _, i := range history {
+		var createEventErr error
+		switch role := i.GetRole(); role {
+		case SystemRole:
+			_, createEventErr = app.db.CreateChatEvent(ctx, db.CreateChatEventArgs{
+				ChatID:  chatID,
+				Kind:    "message.system",
+				Content: must(json.Marshal(map[string]any{"content": i.GetContent()})),
+			})
+		case UserRole:
+			_, createEventErr = app.db.CreateChatEvent(ctx, db.CreateChatEventArgs{
+				ChatID:  chatID,
+				Kind:    "message.user",
+				Content: must(json.Marshal(map[string]any{"content": i.GetContent()})),
+			})
+		case AssistantRole:
+			_, createEventErr = app.db.CreateChatEvent(ctx, db.CreateChatEventArgs{
+				ChatID:  chatID,
+				Kind:    "message.assistant",
+				Content: must(json.Marshal(map[string]any{"content": i.GetContent()})),
+			})
+		}
+		if createEventErr != nil {
+			fmt.Printf("error creating chat event: %v\n", createEventErr)
+			return
+		}
+	}
+	// append reasoning and completion
+	if reasoning.Len() > 0 {
+		if _, err := app.db.CreateChatEvent(ctx, db.CreateChatEventArgs{
+			ChatID:  chatID,
+			Kind:    "other.reasoning",
+			Content: must(json.Marshal(map[string]any{"content": reasoning.String()})),
+		}); err != nil {
+			fmt.Printf("error creating chat event: %v\n", err)
+			return
+		}
+	}
+	if completion.Len() > 0 {
+		if _, err := app.db.CreateChatEvent(ctx, db.CreateChatEventArgs{
+			ChatID:  chatID,
+			Kind:    "message.assistant",
+			Content: must(json.Marshal(map[string]any{"content": completion.String()})),
+		}); err != nil {
+			fmt.Printf("error creating chat event: %v\n", err)
+			return
 		}
 	}
 }
