@@ -12,13 +12,20 @@ import (
 )
 
 type App struct {
-	db     *db.DB
-	token  string
-	models []Model
-	mux    *http.ServeMux
+	dbfolder string
+	db       *db.DB
+	token    string
+	models   []Model
+	mux      *http.ServeMux
 }
 
 type option func(*App)
+
+func WithDatabaseFolder(folder string) option {
+	return func(app *App) {
+		app.dbfolder = folder
+	}
+}
 
 func WithModel(model Model) option {
 	return func(app *App) {
@@ -28,6 +35,7 @@ func WithModel(model Model) option {
 
 func New(token string, opts ...option) *App {
 	app := new(App)
+	app.dbfolder = "./.data"
 	app.token = token
 	app.models = make([]Model, 0)
 	app.mux = http.NewServeMux()
@@ -39,7 +47,7 @@ func New(token string, opts ...option) *App {
 
 func (app *App) ListenAndServe(ctx context.Context) error {
 	// init database
-	if err := app.initDatabase(ctx); err != nil {
+	if err := app.initDatabase(); err != nil {
 		return err
 	}
 	// run migrations
@@ -69,8 +77,8 @@ func (app *App) ListenAndServe(ctx context.Context) error {
 	return server.ListenAndServe()
 }
 
-func (app *App) initDatabase(ctx context.Context) error {
-	client, err := sql.Open("sqlite3", ".data/dev.db")
+func (app *App) initDatabase() error {
+	client, err := sql.Open("sqlite3", fmt.Sprintf("%s/juttele.db", app.dbfolder))
 	if err != nil {
 		return err
 	}
@@ -89,7 +97,13 @@ func (app *App) mountRoutes() error {
 		{"POST /stream", app.handleStreamRoute},
 	}
 	for _, m := range mountables {
-		app.mux.Handle(m.pattern, m.handler)
+		app.mux.Handle(m.pattern,
+			app.corsMiddleware(
+				app.authMiddleware(
+					m.handler,
+				),
+			),
+		)
 	}
 	return nil
 }
@@ -108,8 +122,7 @@ func (app *App) corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (app *App) authMiddleware(nextFunc http.HandlerFunc) http.Handler {
-	next := http.HandlerFunc(nextFunc)
+func (app *App) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
 		if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
