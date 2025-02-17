@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/markusylisiurunen/juttele/internal/repo"
@@ -13,7 +14,6 @@ import (
 )
 
 type sendRequest struct {
-	ChatID        int64  `json:"chat_id"`
 	ModelID       string `json:"model_id"`
 	PersonalityID string `json:"personality_id"`
 	Content       string `json:"content"`
@@ -21,12 +21,17 @@ type sendRequest struct {
 
 func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	chatID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error parsing chat ID: %v", err), http.StatusBadRequest)
+		return
+	}
 	var v sendRequest
 	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
 		http.Error(w, fmt.Sprintf("error decoding request: %v", err), http.StatusBadRequest)
 		return
 	}
-	if v.ChatID <= 0 || v.ModelID == "" || v.PersonalityID == "" || v.Content == "" {
+	if chatID <= 0 || v.ModelID == "" || v.PersonalityID == "" || v.Content == "" {
 		http.Error(w, "chat ID, model ID, personality ID, and content must be provided", http.StatusBadRequest)
 		return
 	}
@@ -48,7 +53,7 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("personality with ID %q not found", v.PersonalityID), http.StatusNotFound)
 		return
 	}
-	events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{ChatID: v.ChatID})
+	events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{ChatID: chatID})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error listing chat events: %v", err), http.StatusInternalServerError)
 		return
@@ -110,9 +115,17 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 	}
+	if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
+		ChatID:  chatID,
+		Kind:    "message.user",
+		Content: util.Must(json.Marshal(map[string]any{"content": v.Content})),
+	}); err != nil {
+		fmt.Printf("error creating chat event: %v\n", err)
+		return
+	}
 	if reasoning.Len() > 0 {
 		if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-			ChatID:  v.ChatID,
+			ChatID:  chatID,
 			Kind:    "other.reasoning",
 			Content: util.Must(json.Marshal(map[string]any{"content": reasoning.String()})),
 		}); err != nil {
@@ -122,7 +135,7 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if completion.Len() > 0 {
 		if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-			ChatID:  v.ChatID,
+			ChatID:  chatID,
 			Kind:    "message.assistant",
 			Content: util.Must(json.Marshal(map[string]any{"content": completion.String()})),
 		}); err != nil {

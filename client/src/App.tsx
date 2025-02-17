@@ -12,6 +12,7 @@ type ChatHistoryItem = {
 };
 
 const App: React.FC = () => {
+  const [chatId, setChatId] = useState(Math.floor(Math.random() * 10e9));
   const [model, setModel] = useState<{ modelId: string; personalityId: string }>();
   const [history, setHistory] = useState([] as ChatHistoryItem[]);
   function onMessage(content: string) {
@@ -26,9 +27,10 @@ const App: React.FC = () => {
         const _history = history.map(({ role, content }) => ({ role, content }));
         _history.push({ role: "user", content });
         await streamCompletion(
+          chatId,
           _model.modelId,
           _model.personalityId,
-          _history,
+          content,
           (thinkingDelta) => {
             setHistory((history) =>
               history.map((i) => {
@@ -73,6 +75,7 @@ const App: React.FC = () => {
     });
   }
   function onControlReset() {
+    setChatId(Math.floor(Math.random() * 10e9));
     setHistory([]);
   }
   function onControlModelChange(modelId: string, personalityId: string) {

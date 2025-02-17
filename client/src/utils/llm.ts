@@ -1,23 +1,19 @@
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-};
-
 async function streamCompletion(
+  chatId: number,
   modelId: string,
   personalityId: string,
-  history: Message[],
+  content: string,
   onThinking: (delta: string) => void,
   onContent: (delta: string) => void,
   onError: (error: string) => void
 ): Promise<void> {
-  const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/stream`, {
+  const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chats/${chatId}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${import.meta.env.VITE_API_KEY}` },
     body: JSON.stringify({
       model_id: modelId,
-      model_personality_id: personalityId,
-      history: history,
+      personality_id: personalityId,
+      content: content,
     }),
   });
   if (!resp.ok) {

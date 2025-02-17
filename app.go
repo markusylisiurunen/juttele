@@ -86,7 +86,7 @@ func (app *App) initModels(ctx context.Context) error {
 
 func (app *App) initDatabase(ctx context.Context) error {
 	client, err := sql.Open("sqlite3",
-		fmt.Sprintf("%s/juttele.db", app.configDataFolder))
+		fmt.Sprintf("file:%s/juttele.db?_fk=1", app.configDataFolder))
 	if err != nil {
 		return err
 	}

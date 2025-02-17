@@ -24,7 +24,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
   }, [selectedModel, selectedPersonality]);
   useEffect(() => {
     void Promise.resolve().then(async () => {
-      const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/models`, {
+      const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/config`, {
         headers: { Authorization: `Bearer ${import.meta.env.VITE_API_KEY}` },
       });
       const { models } = (await resp.json()) as {
