@@ -106,7 +106,8 @@ func (app *App) initRoutes(ctx context.Context) error {
 	mountables := []mountable{
 		{"GET /config", app.configRouteHandler},
 		{"GET /data", app.dataRouteHandler},
-		{"POST /chats/{id}", func(w http.ResponseWriter, r *http.Request) {}},
+		{"POST /rpc", app.rpcRouteHandler},
+		{"POST /chats/{id}", app.sendRouteHandler},
 	}
 	for _, i := range mountables {
 		app.router.Handle(i.pattern, middleware.Auth(app.configToken)(i.handler))

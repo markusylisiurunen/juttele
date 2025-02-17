@@ -6,71 +6,71 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/markusylisiurunen/juttele/internal/repo"
 	"github.com/markusylisiurunen/juttele/internal/util"
+	"github.com/tidwall/gjson"
 )
 
-func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
-	type req struct {
-		ModelID            string `json:"model_id"`
-		ModelPersonalityID string `json:"model_personality_id"`
-		History            []struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
-		} `json:"history"`
-	}
-	var v req
+type sendRequest struct {
+	ChatID        int64  `json:"chat_id"`
+	ModelID       string `json:"model_id"`
+	PersonalityID string `json:"personality_id"`
+	Content       string `json:"content"`
+}
+
+func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var v sendRequest
 	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
 		http.Error(w, fmt.Sprintf("error decoding request: %v", err), http.StatusBadRequest)
 		return
 	}
-	if v.ModelID == "" || v.ModelPersonalityID == "" || len(v.History) == 0 {
-		http.Error(w, "model ID, personality ID, and history are required", http.StatusBadRequest)
+	if v.ChatID <= 0 || v.ModelID == "" || v.PersonalityID == "" || v.Content == "" {
+		http.Error(w, "chat ID, model ID, personality ID, and content must be provided", http.StatusBadRequest)
 		return
 	}
-	// find the requested model
-	modelIdx := slices.IndexFunc(app.models, func(model Model) bool {
-		return model.GetModelInfo().ID == v.ModelID
-	})
+	modelIdx := slices.IndexFunc(app.models, func(model Model) bool { return model.GetModelInfo().ID == v.ModelID })
 	if modelIdx == -1 {
 		http.Error(w, fmt.Sprintf("model with ID %q not found", v.ModelID), http.StatusNotFound)
 		return
 	}
 	model := app.models[modelIdx]
-	// find the requested personality's system prompt
 	var systemPrompt *string
 	for _, i := range model.GetModelInfo().Personalities {
-		if i.ID == v.ModelPersonalityID {
+		if i.ID == v.PersonalityID {
 			v := i.SystemPrompt
 			systemPrompt = &v
 			break
 		}
 	}
 	if systemPrompt == nil {
-		http.Error(w, fmt.Sprintf("personality with ID %q not found", v.ModelPersonalityID), http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("personality with ID %q not found", v.PersonalityID), http.StatusNotFound)
 		return
 	}
-	// construct the full conversation history
-	history := make([]Message, 0, 1+len(v.History))
-	// append the system prompt if defined
+	events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{ChatID: v.ChatID})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("error listing chat events: %v", err), http.StatusInternalServerError)
+		return
+	}
+	history := make([]Message, 0, 1+len(events.Items))
 	if *systemPrompt != "" {
 		history = append(history, SystemMessage(*systemPrompt))
 	}
-	// append the user and assistant messages
-	for _, i := range v.History {
-		switch i.Role {
-		case "user":
-			history = append(history, UserMessage(i.Content))
-		case "assistant":
-			history = append(history, AssistantMessage("", i.Content))
-		default:
-			http.Error(w, fmt.Sprintf("invalid role %q", i.Role), http.StatusBadRequest)
-			return
+	for _, i := range events.Items {
+		if !strings.HasPrefix(i.Kind, "message.") {
+			continue
+		}
+		switch i.Kind {
+		case "message.user":
+			content := gjson.GetBytes(i.Content, "content").String()
+			history = append(history, UserMessage(content))
+		case "message.assistant":
+			content := gjson.GetBytes(i.Content, "content").String()
+			history = append(history, AssistantMessage("", content))
 		}
 	}
-	// send the headers
+	history = append(history, UserMessage(v.Content))
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
@@ -79,7 +79,6 @@ func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.WriteHeader(http.StatusOK)
-	// stream the completion
 	var (
 		reasoning  strings.Builder
 		completion strings.Builder
@@ -111,47 +110,9 @@ func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 	}
-	// FIXME: this should definitely not be here
-	ctx := r.Context()
-	chatID, err := app.repo.CreateChat(ctx, repo.CreateChatArgs{
-		Title: time.Now().UTC().Format("2006-01-02 15:04:05"),
-	})
-	if err != nil {
-		fmt.Printf("error creating chat: %v\n", err)
-		return
-	}
-	// append events from the conversation history
-	for _, i := range history {
-		var createEventErr error
-		switch role := i.GetRole(); role {
-		case SystemRole:
-			_, createEventErr = app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-				ChatID:  chatID,
-				Kind:    "message.system",
-				Content: util.Must(json.Marshal(map[string]any{"content": i.GetContent()})),
-			})
-		case UserRole:
-			_, createEventErr = app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-				ChatID:  chatID,
-				Kind:    "message.user",
-				Content: util.Must(json.Marshal(map[string]any{"content": i.GetContent()})),
-			})
-		case AssistantRole:
-			_, createEventErr = app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-				ChatID:  chatID,
-				Kind:    "message.assistant",
-				Content: util.Must(json.Marshal(map[string]any{"content": i.GetContent()})),
-			})
-		}
-		if createEventErr != nil {
-			fmt.Printf("error creating chat event: %v\n", createEventErr)
-			return
-		}
-	}
-	// append reasoning and completion
 	if reasoning.Len() > 0 {
 		if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-			ChatID:  chatID,
+			ChatID:  v.ChatID,
 			Kind:    "other.reasoning",
 			Content: util.Must(json.Marshal(map[string]any{"content": reasoning.String()})),
 		}); err != nil {
@@ -161,7 +122,7 @@ func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	if completion.Len() > 0 {
 		if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-			ChatID:  chatID,
+			ChatID:  v.ChatID,
 			Kind:    "message.assistant",
 			Content: util.Must(json.Marshal(map[string]any{"content": completion.String()})),
 		}); err != nil {
