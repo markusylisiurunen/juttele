@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/markusylisiurunen/juttele/internal/util"
 )
 
 var _ Model = (*groqModel)(nil)
@@ -37,10 +38,10 @@ func WithGroqModelDisplayName(name string) groqModelOption {
 func WithGroqModelPersonality(name string, systemPrompt string) groqModelOption {
 	return func(m *groqModel) {
 		id := xxhash.New()
-		must(id.WriteString("groq"))
-		must(id.WriteString("personality"))
-		must(id.WriteString(m.id))
-		must(id.WriteString(name))
+		util.Must(id.WriteString("groq"))
+		util.Must(id.WriteString("personality"))
+		util.Must(id.WriteString(m.id))
+		util.Must(id.WriteString(name))
 		m.personalities = append(m.personalities, groqModelPersonality{
 			id:           strconv.FormatUint(id.Sum64(), 10),
 			name:         name,
@@ -51,8 +52,8 @@ func WithGroqModelPersonality(name string, systemPrompt string) groqModelOption 
 
 func NewGroqModel(apiKey string, modelName string, opts ...groqModelOption) *groqModel {
 	id := xxhash.New()
-	must(id.WriteString("groq"))
-	must(id.WriteString(modelName))
+	util.Must(id.WriteString("groq"))
+	util.Must(id.WriteString(modelName))
 	m := &groqModel{
 		id:            "groq_" + strconv.FormatUint(id.Sum64(), 10),
 		apiKey:        apiKey,

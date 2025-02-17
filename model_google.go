@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/markusylisiurunen/juttele/internal/util"
 )
 
 var _ Model = (*googleModel)(nil)
@@ -39,10 +40,10 @@ func WithGoogleModelDisplayName(name string) googleModelOption {
 func WithGoogleModelPersonality(name string, systemPrompt string) googleModelOption {
 	return func(m *googleModel) {
 		id := xxhash.New()
-		must(id.WriteString("google"))
-		must(id.WriteString("personality"))
-		must(id.WriteString(m.id))
-		must(id.WriteString(name))
+		util.Must(id.WriteString("google"))
+		util.Must(id.WriteString("personality"))
+		util.Must(id.WriteString(m.id))
+		util.Must(id.WriteString(name))
 		m.personalities = append(m.personalities, googleModelPersonality{
 			id:           strconv.FormatUint(id.Sum64(), 10),
 			name:         name,
@@ -53,8 +54,8 @@ func WithGoogleModelPersonality(name string, systemPrompt string) googleModelOpt
 
 func NewGoogleModel(apiKey string, modelName string, opts ...googleModelOption) *googleModel {
 	id := xxhash.New()
-	must(id.WriteString("google"))
-	must(id.WriteString(modelName))
+	util.Must(id.WriteString("google"))
+	util.Must(id.WriteString(modelName))
 	m := &googleModel{
 		id:            "google_" + strconv.FormatUint(id.Sum64(), 10),
 		apiKey:        apiKey,

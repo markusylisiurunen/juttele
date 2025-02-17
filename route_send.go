@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/markusylisiurunen/juttele/internal/db"
+	"github.com/markusylisiurunen/juttele/internal/repo"
+	"github.com/markusylisiurunen/juttele/internal/util"
 )
 
 func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
@@ -91,28 +92,28 @@ func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
 		chunk := i.getChunk()
 		if chunk.t == errChunkType {
 			data := map[string]string{"error": chunk.err.Error()}
-			fmt.Fprintf(w, "data: %s\n\n", must(json.Marshal(data)))
+			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(data)))
 			flusher.Flush()
 			return
 		}
 		if chunk.t == thinkingChunkType {
 			reasoning.WriteString(chunk.thinking)
 			data := map[string]string{"thinking": chunk.thinking}
-			fmt.Fprintf(w, "data: %s\n\n", must(json.Marshal(data)))
+			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(data)))
 			flusher.Flush()
 			continue
 		}
 		if chunk.t == contentChunkType {
 			completion.WriteString(chunk.content)
 			data := map[string]string{"content": chunk.content}
-			fmt.Fprintf(w, "data: %s\n\n", must(json.Marshal(data)))
+			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(data)))
 			flusher.Flush()
 			continue
 		}
 	}
 	// FIXME: this should definitely not be here
 	ctx := r.Context()
-	chatID, err := app.db.CreateChat(ctx, db.CreateChatArgs{
+	chatID, err := app.repo.CreateChat(ctx, repo.CreateChatArgs{
 		Title: time.Now().UTC().Format("2006-01-02 15:04:05"),
 	})
 	if err != nil {
@@ -124,22 +125,22 @@ func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
 		var createEventErr error
 		switch role := i.GetRole(); role {
 		case SystemRole:
-			_, createEventErr = app.db.CreateChatEvent(ctx, db.CreateChatEventArgs{
+			_, createEventErr = app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
 				ChatID:  chatID,
 				Kind:    "message.system",
-				Content: must(json.Marshal(map[string]any{"content": i.GetContent()})),
+				Content: util.Must(json.Marshal(map[string]any{"content": i.GetContent()})),
 			})
 		case UserRole:
-			_, createEventErr = app.db.CreateChatEvent(ctx, db.CreateChatEventArgs{
+			_, createEventErr = app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
 				ChatID:  chatID,
 				Kind:    "message.user",
-				Content: must(json.Marshal(map[string]any{"content": i.GetContent()})),
+				Content: util.Must(json.Marshal(map[string]any{"content": i.GetContent()})),
 			})
 		case AssistantRole:
-			_, createEventErr = app.db.CreateChatEvent(ctx, db.CreateChatEventArgs{
+			_, createEventErr = app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
 				ChatID:  chatID,
 				Kind:    "message.assistant",
-				Content: must(json.Marshal(map[string]any{"content": i.GetContent()})),
+				Content: util.Must(json.Marshal(map[string]any{"content": i.GetContent()})),
 			})
 		}
 		if createEventErr != nil {
@@ -149,20 +150,20 @@ func (app *App) handleStreamRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	// append reasoning and completion
 	if reasoning.Len() > 0 {
-		if _, err := app.db.CreateChatEvent(ctx, db.CreateChatEventArgs{
+		if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
 			ChatID:  chatID,
 			Kind:    "other.reasoning",
-			Content: must(json.Marshal(map[string]any{"content": reasoning.String()})),
+			Content: util.Must(json.Marshal(map[string]any{"content": reasoning.String()})),
 		}); err != nil {
 			fmt.Printf("error creating chat event: %v\n", err)
 			return
 		}
 	}
 	if completion.Len() > 0 {
-		if _, err := app.db.CreateChatEvent(ctx, db.CreateChatEventArgs{
+		if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
 			ChatID:  chatID,
 			Kind:    "message.assistant",
-			Content: must(json.Marshal(map[string]any{"content": completion.String()})),
+			Content: util.Must(json.Marshal(map[string]any{"content": completion.String()})),
 		}); err != nil {
 			fmt.Printf("error creating chat event: %v\n", err)
 			return

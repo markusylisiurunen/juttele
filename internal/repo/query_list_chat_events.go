@@ -1,4 +1,4 @@
-package db
+package repo
 
 import (
 	"context"
@@ -18,14 +18,14 @@ type ListChatEventsResult struct {
 	}
 }
 
-func (db *DB) ListChatEvents(ctx context.Context, args ListChatEventsArgs) (ListChatEventsResult, error) {
+func (r *Repository) ListChatEvents(ctx context.Context, args ListChatEventsArgs) (ListChatEventsResult, error) {
 	var query = `
 	select chat_event_created_at, chat_event_kind, chat_event_content
 	from chat_events
 	where chat_id = ?
 	order by chat_event_created_at asc
 	`
-	rows, err := db.QueryContext(ctx, query, args.ChatID)
+	rows, err := r.db.QueryContext(ctx, query, args.ChatID)
 	if err != nil {
 		return ListChatEventsResult{}, err
 	}
@@ -51,5 +51,5 @@ func (db *DB) ListChatEvents(ctx context.Context, args ListChatEventsArgs) (List
 		}
 		items = append(items, item)
 	}
-	return ListChatEventsResult{Items: items}, nil
+	return ListChatEventsResult{items}, nil
 }

@@ -1,4 +1,4 @@
-package db
+package repo
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 var migrationFiles embed.FS
 
 func Migrate(ctx context.Context, db *sql.DB) error {
-	// create the `schema_versions` table if it doesn't exist
 	var createSchemaVersionsQuery = `
 	create table if not exists schema_versions (
 		version integer primary key,
@@ -24,7 +23,6 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, createSchemaVersionsQuery); err != nil {
 		return fmt.Errorf("error creating schema_versions table: %w", err)
 	}
-	// read the migration files
 	files, err := migrationFiles.ReadDir("migrations")
 	if err != nil {
 		return fmt.Errorf("error reading migration files: %w", err)
@@ -44,7 +42,6 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	sort.Slice(migrations, func(i, j int) bool {
 		return migrations[i].version < migrations[j].version
 	})
-	// get the current version
 	var getCurrentVersionQuery = `
 	select coalesce(max(version), 0) from schema_versions
 	`
@@ -52,7 +49,6 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	if err := db.QueryRowContext(ctx, getCurrentVersionQuery).Scan(&currentVersion); err != nil {
 		return fmt.Errorf("error getting current version: %w", err)
 	}
-	// apply the pending migrations
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("error starting transaction: %w", err)

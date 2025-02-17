@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/markusylisiurunen/juttele/internal/util"
 )
 
 var _ Model = (*openRouterModel)(nil)
@@ -37,10 +38,10 @@ func WithOpenRouterModelDisplayName(name string) openRouterModelOption {
 func WithOpenRouterModelPersonality(name string, systemPrompt string) openRouterModelOption {
 	return func(m *openRouterModel) {
 		id := xxhash.New()
-		must(id.WriteString("openrouter"))
-		must(id.WriteString("personality"))
-		must(id.WriteString(m.id))
-		must(id.WriteString(name))
+		util.Must(id.WriteString("openrouter"))
+		util.Must(id.WriteString("personality"))
+		util.Must(id.WriteString(m.id))
+		util.Must(id.WriteString(name))
 		m.personalities = append(m.personalities, openRouterModelPersonality{
 			id:           strconv.FormatUint(id.Sum64(), 10),
 			name:         name,
@@ -51,8 +52,8 @@ func WithOpenRouterModelPersonality(name string, systemPrompt string) openRouter
 
 func NewOpenRouterModel(apiKey string, modelName string, opts ...openRouterModelOption) *openRouterModel {
 	id := xxhash.New()
-	must(id.WriteString("openrouter"))
-	must(id.WriteString(modelName))
+	util.Must(id.WriteString("openrouter"))
+	util.Must(id.WriteString(modelName))
 	m := &openRouterModel{
 		id:            "openrouter_" + strconv.FormatUint(id.Sum64(), 10),
 		apiKey:        apiKey,

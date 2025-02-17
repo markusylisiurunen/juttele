@@ -7,90 +7,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"runtime/debug"
 	"strings"
-	"time"
+
+	"github.com/markusylisiurunen/juttele/internal/util"
 )
-
-func must[T any](v T, err error) T {
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-type result[T any] struct {
-	val T
-	err error
-}
-
-func safeGo[T any](
-	ctx context.Context,
-	fn func(ctx context.Context, vs chan<- T, errs chan<- error),
-) (<-chan result[T], context.CancelFunc) {
-	ctx, cancel := context.WithCancel(ctx)
-	out := make(chan result[T], 1)
-	go func() {
-		defer close(out)
-		defer func() {
-			if r := recover(); r != nil {
-				stack := debug.Stack()
-				err, ok := r.(error)
-				if !ok {
-					err = fmt.Errorf("%v", r)
-				}
-				select {
-				case out <- result[T]{err: fmt.Errorf("panic: %w; stack: %s", err, stack)}:
-				case <-time.After(5 * time.Second):
-				}
-			}
-		}()
-		vs, errs := make(chan T), make(chan error)
-		go func() {
-			defer close(vs)
-			defer close(errs)
-			defer func() {
-				if r := recover(); r != nil {
-					stack := debug.Stack()
-					err, ok := r.(error)
-					if !ok {
-						err = fmt.Errorf("%v", r)
-					}
-					select {
-					case errs <- fmt.Errorf("panic: %w; stack: %s", err, stack):
-					case <-time.After(5 * time.Second):
-					}
-				}
-			}()
-			fn(ctx, vs, errs)
-		}()
-		var vClosed, errClosed bool
-		for !vClosed || !errClosed {
-			select {
-			case v, ok := <-vs:
-				if !ok {
-					vClosed = true
-					continue
-				}
-				out <- result[T]{val: v}
-			case err, ok := <-errs:
-				if !ok {
-					errClosed = true
-					continue
-				}
-				out <- result[T]{err: err}
-			}
-		}
-	}()
-	return out, cancel
-}
 
 func streamOpenAICompatibleCompletion(
 	ctx context.Context,
 	sendRequest func(context.Context) (*http.Response, error),
 	processDataChunk func([]byte) (Chunk, error),
 ) <-chan Chunk {
-	out, _ := safeGo(ctx, func(ctx context.Context, vs chan<- Chunk, errs chan<- error) {
+	out, _ := util.SafeGo(ctx, func(ctx context.Context, vs chan<- Chunk, errs chan<- error) {
 		resp, err := sendRequest(ctx)
 		if err != nil {
 			errs <- fmt.Errorf("request error: %w", err)
@@ -130,11 +57,11 @@ func streamOpenAICompatibleCompletion(
 	go func() {
 		defer close(ch)
 		for v := range out {
-			if v.err != nil {
-				ch <- ErrorChunk(v.err)
+			if v.Err != nil {
+				ch <- ErrorChunk(v.Err)
 				continue
 			}
-			ch <- v.val
+			ch <- v.Val
 		}
 	}()
 	return ch
