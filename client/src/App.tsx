@@ -1,18 +1,22 @@
 import "./styles/globals.css";
 
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import { API, ConfigResponse, DataResponse } from "./api";
 import { ChatHistory, MessageBox } from "./components";
-import { streamCompletion } from "./utils";
+import { ChatHistoryItem } from "./entities";
+import { atom, Atom, streamCompletion } from "./utils";
 
-type ChatHistoryItem = {
-  id: string;
-  role: "user" | "assistant";
-  thinking?: string;
-  content: string;
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_KEY = import.meta.env.VITE_API_KEY;
+
+type AppProps = {
+  api: API;
+  configAtom: Atom<ConfigResponse>;
+  dataAtom: Atom<DataResponse>;
+  chatId: number;
+  onReset: () => void;
 };
-
-const App: React.FC = () => {
-  const [chatId, setChatId] = useState(Math.floor(Math.random() * 10e9));
+const App: React.FC<AppProps> = ({ configAtom, chatId, onReset }) => {
   const [model, setModel] = useState<{ modelId: string; personalityId: string }>();
   const [history, setHistory] = useState([] as ChatHistoryItem[]);
   function onMessage(content: string) {
@@ -27,6 +31,8 @@ const App: React.FC = () => {
         const _history = history.map(({ role, content }) => ({ role, content }));
         _history.push({ role: "user", content });
         await streamCompletion(
+          BASE_URL,
+          API_KEY,
           chatId,
           _model.modelId,
           _model.personalityId,
@@ -75,8 +81,7 @@ const App: React.FC = () => {
     });
   }
   function onControlReset() {
-    setChatId(Math.floor(Math.random() * 10e9));
-    setHistory([]);
+    onReset();
   }
   function onControlModelChange(modelId: string, personalityId: string) {
     setModel({ modelId, personalityId });
@@ -85,6 +90,7 @@ const App: React.FC = () => {
     <div className="container">
       <ChatHistory history={history} />
       <MessageBox
+        configAtom={configAtom}
         onMessage={onMessage}
         onControlReset={onControlReset}
         onControlModelChange={onControlModelChange}
@@ -93,4 +99,45 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+const AppWrapper: React.FC = () => {
+  const api = useMemo(() => new API(BASE_URL, API_KEY), []);
+  const [configAtom, setConfigAtom] = useState<Atom<ConfigResponse>>();
+  const [dataAtom, setDataAtom] = useState<Atom<DataResponse>>();
+  const [chatId, setChatId] = useState<number>();
+  const _init = useRef(false);
+  async function init() {
+    if (_init.current) return;
+    _init.current = true;
+    try {
+      const [config, data, chat] = await Promise.all([
+        api.getConfig(),
+        api.getData(),
+        api.rpc("create_chat", {}) as Promise<{ chat_id: number }>,
+      ]);
+      setConfigAtom(atom(config));
+      setDataAtom(atom(data));
+      setChatId(chat.chat_id);
+    } finally {
+      _init.current = false;
+    }
+  }
+  if (!configAtom || !dataAtom || !chatId) {
+    void init();
+    return null;
+  }
+  return (
+    <App
+      api={api}
+      configAtom={configAtom}
+      dataAtom={dataAtom}
+      chatId={chatId}
+      onReset={() => {
+        setConfigAtom(undefined);
+        setDataAtom(undefined);
+        setChatId(undefined);
+      }}
+    />
+  );
+};
+
+export default AppWrapper;

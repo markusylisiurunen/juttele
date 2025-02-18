@@ -74,6 +74,7 @@ func (app *App) dataRouteHandler(w http.ResponseWriter, r *http.Request) {
 		v.Chats = append(v.Chats, vi)
 	}
 	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		http.Error(w, fmt.Sprintf("error encoding response: %v", err), http.StatusInternalServerError)
 	}

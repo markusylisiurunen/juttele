@@ -1,6 +1,7 @@
 import { micromark } from "micromark";
 import React, { useEffect, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
+import { ChatHistoryItem } from "../../entities";
 import styles from "./ChatHistory.module.css";
 
 type ThinkingProps = {
@@ -100,25 +101,12 @@ const _Message: React.FC<MessageProps> = ({ role, thinking, content }) => {
 const Message = React.memo(_Message);
 
 type ChatHistoryProps = {
-  history: {
-    id: string;
-    role: string;
-    thinking?: string;
-    content: string;
-  }[];
+  history: ChatHistoryItem[];
 };
 const ChatHistory: React.FC<ChatHistoryProps> = ({ history }) => {
-  const scrollViewRef = useRef<HTMLDivElement>(null);
-  // useEffect(() => {
-  //   if (!scrollViewRef.current) return;
-  //   scrollViewRef.current.scrollBy({
-  //     top: scrollViewRef.current.scrollHeight,
-  //     behavior: "smooth",
-  //   });
-  // }, [history.map((i) => i.id + i.content.trim()).join("_")]);
   return (
     <div className={styles.root}>
-      <div className={styles.history} ref={scrollViewRef}>
+      <div className={styles.history}>
         {history.map((item) => (
           <Message key={item.id} role={item.role} thinking={item.thinking} content={item.content} />
         ))}

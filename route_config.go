@@ -38,6 +38,7 @@ func (app *App) configRouteHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		http.Error(w, fmt.Sprintf("error encoding response: %v", err), http.StatusInternalServerError)
 	}

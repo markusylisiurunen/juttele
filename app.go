@@ -68,8 +68,13 @@ func (app *App) ListenAndServe(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		server.Shutdown(ctx)
+		app.db.Close()
 	}()
-	return server.ListenAndServe()
+	err := server.ListenAndServe()
+	if err == http.ErrServerClosed {
+		return nil
+	}
+	return err
 }
 
 // ---

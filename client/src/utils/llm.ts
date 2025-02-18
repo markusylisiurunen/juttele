@@ -1,4 +1,6 @@
 async function streamCompletion(
+  baseUrl: string,
+  apiKey: string,
   chatId: number,
   modelId: string,
   personalityId: string,
@@ -7,9 +9,9 @@ async function streamCompletion(
   onContent: (delta: string) => void,
   onError: (error: string) => void
 ): Promise<void> {
-  const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chats/${chatId}`, {
+  const resp = await fetch(`${baseUrl}/chats/${chatId}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${import.meta.env.VITE_API_KEY}` },
+    headers: { Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model_id: modelId,
       personality_id: personalityId,

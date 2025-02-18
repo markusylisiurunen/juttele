@@ -1,49 +1,36 @@
 import { listen } from "@tauri-apps/api/event";
 import React, { useEffect, useRef, useState } from "react";
+import { ConfigResponse } from "../../api";
+import { Atom, useAtomWithSelector } from "../../utils";
 import styles from "./MessageBox.module.css";
 
 type MessageBoxProps = {
+  configAtom: Atom<ConfigResponse>;
   onMessage: (message: string) => void;
   onControlReset: () => void;
   onControlModelChange: (modelId: string, personalityId: string) => void;
 };
 const MessageBox: React.FC<MessageBoxProps> = ({
+  configAtom,
   onMessage,
   onControlReset,
   onControlModelChange,
 }) => {
-  type Model = { id: string; name: string; personalities: Personality[] };
-  type Personality = { id: string; name: string };
-  const [models, setModels] = useState<Model[]>([]);
-  const [personalities, setPersonalities] = useState<Personality[]>([]);
-  const [selectedModel, setSelectedModel] = useState<Model>();
-  const [selectedPersonality, setSelectedPersonality] = useState<Personality>();
+  type Model = ConfigResponse["models"][number];
+  type Personality = Model["personalities"][number];
+  const [model, setModel] = useState<Model>();
+  const [personality, setPersonality] = useState<Personality>();
+  const options = useAtomWithSelector(configAtom, (config) => config.models);
   useEffect(() => {
-    if (!selectedModel || !selectedPersonality) return;
-    onControlModelChange(selectedModel.id, selectedPersonality.id);
-  }, [selectedModel, selectedPersonality]);
+    if (!model || !personality) return;
+    onControlModelChange(model.id, personality.id);
+  }, [model, personality]);
   useEffect(() => {
-    void Promise.resolve().then(async () => {
-      const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/config`, {
-        headers: { Authorization: `Bearer ${import.meta.env.VITE_API_KEY}` },
-      });
-      const { models } = (await resp.json()) as {
-        models: {
-          id: string;
-          name: string;
-          personalities: {
-            id: string;
-            name: string;
-          }[];
-        }[];
-      };
-      setModels(models);
-      const _selectedModel = models[0];
-      setSelectedModel(_selectedModel);
-      setPersonalities(_selectedModel.personalities);
-      const _selectedPersonality = _selectedModel.personalities[0];
-      setSelectedPersonality(_selectedPersonality);
-    });
+    if (model && personality) return;
+    const _selectedModel = options[0];
+    const _selectedPersonality = _selectedModel.personalities[0];
+    setModel(_selectedModel);
+    setPersonality(_selectedPersonality);
   }, []);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -51,7 +38,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
       textareaRef.current?.focus();
     });
     return () => {
-      unlistenPromise.then((unlisten) => unlisten());
+      void unlistenPromise.then((unlisten) => unlisten());
     };
   }, []);
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -66,21 +53,21 @@ const MessageBox: React.FC<MessageBoxProps> = ({
     onControlReset();
   }
   function onModelChangeClick() {
-    const nextModelIdx = models.findIndex((i) => i.id === selectedModel?.id);
-    const nextModel = models[(nextModelIdx + 1) % models.length];
+    const nextModelIdx = options.findIndex((i) => i.id === model?.id);
+    const nextModel = options[(nextModelIdx + 1) % options.length];
     if (!nextModel) {
-      setSelectedModel(undefined);
-      setSelectedPersonality(undefined);
+      setModel(undefined);
+      setPersonality(undefined);
       return;
     }
-    setSelectedModel(nextModel);
-    setPersonalities(nextModel.personalities);
-    setSelectedPersonality(nextModel.personalities[0]);
+    setModel(nextModel);
+    setPersonality(nextModel.personalities[0]);
   }
   function onPersonalityChangeClick() {
-    const nextPersonalityIdx = personalities.findIndex((i) => i.id === selectedPersonality?.id);
+    const personalities = model?.personalities || [];
+    const nextPersonalityIdx = personalities.findIndex((i) => i.id === personality?.id);
     const nextPersonality = personalities[(nextPersonalityIdx + 1) % personalities.length];
-    setSelectedPersonality(nextPersonality);
+    setPersonality(nextPersonality);
   }
   return (
     <div className={styles.root}>
@@ -89,8 +76,8 @@ const MessageBox: React.FC<MessageBoxProps> = ({
       </div>
       <div className={styles.footer}>
         <button onClick={onResetClick}>Reset</button>
-        <button onClick={onModelChangeClick}>{selectedModel?.name}</button>
-        <button onClick={onPersonalityChangeClick}>{selectedPersonality?.name}</button>
+        <button onClick={onModelChangeClick}>{model?.name}</button>
+        <button onClick={onPersonalityChangeClick}>{personality?.name}</button>
       </div>
     </div>
   );
