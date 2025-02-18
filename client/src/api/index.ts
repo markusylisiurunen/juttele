@@ -20,24 +20,25 @@ const DataResponse = z.object({
   chats: z.array(
     z.object({
       id: z.number(),
+      created_at: z.string().datetime(),
       title: z.string(),
-      // history: z.array(
-      //   z.union([
-      //     z.object({
-      //       kind: z.literal("message"),
-      //       data: z.object({
-      //         role: z.union([z.literal("user"), z.literal("assistant")]),
-      //         content: z.string(),
-      //       }),
-      //     }),
-      //     z.object({
-      //       kind: z.literal("reasoning"),
-      //       data: z.object({
-      //         content: z.string(),
-      //       }),
-      //     }),
-      //   ])
-      // ),
+      history: z.array(
+        z.union([
+          z.object({
+            kind: z.literal("message"),
+            data: z.object({
+              role: z.union([z.literal("system"), z.literal("user"), z.literal("assistant")]),
+              content: z.string(),
+            }),
+          }),
+          z.object({
+            kind: z.literal("reasoning"),
+            data: z.object({
+              content: z.string(),
+            }),
+          }),
+        ])
+      ),
     })
   ),
 });

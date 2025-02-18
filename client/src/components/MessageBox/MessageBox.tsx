@@ -7,12 +7,14 @@ import styles from "./MessageBox.module.css";
 type MessageBoxProps = {
   configAtom: Atom<ConfigResponse>;
   onMessage: (message: string) => void;
+  onControlGoToChats: () => void;
   onControlReset: () => void;
   onControlModelChange: (modelId: string, personalityId: string) => void;
 };
 const MessageBox: React.FC<MessageBoxProps> = ({
   configAtom,
   onMessage,
+  onControlGoToChats,
   onControlReset,
   onControlModelChange,
 }) => {
@@ -49,6 +51,9 @@ const MessageBox: React.FC<MessageBoxProps> = ({
       target.value = "";
     }
   }
+  function onChatsClick() {
+    onControlGoToChats();
+  }
   function onResetClick() {
     onControlReset();
   }
@@ -75,6 +80,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
         <textarea ref={textareaRef} rows={1} placeholder="Ask anything" onKeyDown={onKeyDown} />
       </div>
       <div className={styles.footer}>
+        <button onClick={onChatsClick}>Chats</button>
         <button onClick={onResetClick}>Reset</button>
         <button onClick={onModelChangeClick}>{model?.name}</button>
         <button onClick={onPersonalityChangeClick}>{personality?.name}</button>
