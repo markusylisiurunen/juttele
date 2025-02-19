@@ -14,7 +14,7 @@
   flex-direction: column;
   overflow-y: auto;
   padding-block-end: calc(var(--spacing-padding-x) + var(--chat-history-fade-height));
-  padding-block-start: var(--spacing-padding-x);
+  padding-block-start: 64px;
 }
 .thinking {
   background: color-mix(in srgb, var(--color-text) 2%, transparent);

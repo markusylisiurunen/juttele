@@ -17,7 +17,62 @@
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
 }
-.container {
+button {
+  align-items: center;
+  appearance: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  padding: 0px;
+}
+
+.app-header {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  height: 64px;
+  justify-content: space-between;
+  left: 50%;
+  max-width: var(--max-width);
+  padding-inline: var(--spacing-padding-x);
+  position: fixed;
+  top: 0px;
+  transform: translateX(-50%);
+  width: 100vw;
+  z-index: 999;
+
+  --gradient-1: color-mix(in srgb, var(--color-bg) 100%, transparent);
+  --gradient-2: color-mix(in srgb, var(--color-bg) 97%, transparent);
+  --gradient-3: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  --gradient-4: color-mix(in srgb, var(--color-bg) 0%, transparent);
+  background: linear-gradient(
+    to bottom,
+    var(--gradient-1) 0%,
+    var(--gradient-2) 50%,
+    var(--gradient-3) 67%,
+    var(--gradient-4) 100%
+  );
+}
+.app-header > div {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+.app-header button {
+  align-items: center;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--color-text) 6%, transparent);
+  height: 36px;
+  justify-content: center;
+  transition: border 120ms linear;
+  width: 36px;
+}
+.app-header button:hover {
+  border-color: color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+.app-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -25,4 +80,26 @@
   margin-inline: auto;
   max-width: var(--max-width);
   padding: 0px;
+}
+
+.chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100vh;
+  margin-inline: auto;
+  max-width: var(--max-width);
+  overflow-y: auto;
+  padding-block: var(--spacing-padding-x);
+  padding-inline: var(--spacing-padding-x);
+}
+.chat-list button {
+  border-radius: 8px;
+  border: 1.5px solid color-mix(in srgb, var(--color-text) 2%, transparent);
+  padding-block: 8px;
+  padding-inline: 12px;
+  transition: border 120ms linear;
+}
+.chat-list button:hover {
+  border-color: color-mix(in srgb, var(--color-text) 12%, transparent);
 }

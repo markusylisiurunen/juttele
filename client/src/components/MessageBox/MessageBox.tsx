@@ -7,17 +7,9 @@ import styles from "./MessageBox.module.css";
 type MessageBoxProps = {
   configAtom: Atom<ConfigResponse>;
   onMessage: (message: string) => void;
-  onControlGoToChats: () => void;
-  onControlReset: () => void;
   onControlModelChange: (modelId: string, personalityId: string) => void;
 };
-const MessageBox: React.FC<MessageBoxProps> = ({
-  configAtom,
-  onMessage,
-  onControlGoToChats,
-  onControlReset,
-  onControlModelChange,
-}) => {
+const MessageBox: React.FC<MessageBoxProps> = ({ configAtom, onMessage, onControlModelChange }) => {
   type Model = ConfigResponse["models"][number];
   type Personality = Model["personalities"][number];
   const [model, setModel] = useState<Model>();
@@ -51,12 +43,6 @@ const MessageBox: React.FC<MessageBoxProps> = ({
       target.value = "";
     }
   }
-  function onChatsClick() {
-    onControlGoToChats();
-  }
-  function onResetClick() {
-    onControlReset();
-  }
   function onModelChangeClick() {
     const nextModelIdx = options.findIndex((i) => i.id === model?.id);
     const nextModel = options[(nextModelIdx + 1) % options.length];
@@ -80,8 +66,6 @@ const MessageBox: React.FC<MessageBoxProps> = ({
         <textarea ref={textareaRef} rows={1} placeholder="Ask anything" onKeyDown={onKeyDown} />
       </div>
       <div className={styles.footer}>
-        <button onClick={onChatsClick}>Chats</button>
-        <button onClick={onResetClick}>Reset</button>
         <button onClick={onModelChangeClick}>{model?.name}</button>
         <button onClick={onPersonalityChangeClick}>{personality?.name}</button>
       </div>

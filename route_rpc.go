@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/markusylisiurunen/juttele/internal/repo"
+	"github.com/tidwall/gjson"
 )
 
 type rpcRequest struct {
@@ -43,8 +44,14 @@ func (app *App) rpcRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app *App) rpcCreateChat(ctx context.Context, _ []byte) ([]byte, error) {
-	id, err := app.repo.CreateChat(ctx, repo.CreateChatArgs{Title: "Chat"})
+func (app *App) rpcCreateChat(ctx context.Context, args []byte) ([]byte, error) {
+	title := gjson.GetBytes(args, "title").String()
+	if title == "" {
+		return nil, fmt.Errorf("title is required")
+	}
+	id, err := app.repo.CreateChat(ctx, repo.CreateChatArgs{
+		Title: title,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("error creating chat: %w", err)
 	}
