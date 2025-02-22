@@ -1,8 +1,7 @@
 :root {
   --color-bg: lch(3.2% 0 0);
-  --color-border-focus: lch(88% 108 28);
-  --color-text-link: lch(88% 108 28);
+  --color-text-link: lch(82% 108 298);
   --color-text: lch(97% 0 0);
-  --max-width: 720px;
+  --max-width: 800px;
   --spacing-padding-x: 16px;
 }

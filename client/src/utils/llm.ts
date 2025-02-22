@@ -7,6 +7,7 @@ async function streamCompletion(
   content: string,
   onThinking: (delta: string) => void,
   onContent: (delta: string) => void,
+  onToolCall: (tool: string, args: string) => void,
   onError: (error: string) => void
 ): Promise<void> {
   const resp = await fetch(`${baseUrl}/chats/${chatId}`, {
@@ -39,6 +40,7 @@ async function streamCompletion(
             error?: string;
             thinking?: string;
             content?: string;
+            tool_call?: { name: string; args: string };
           };
           if (parsed.error) {
             onError(parsed.error);
@@ -46,6 +48,8 @@ async function streamCompletion(
             onThinking(parsed.thinking);
           } else if (parsed.content) {
             onContent(parsed.content);
+          } else if (parsed.tool_call) {
+            onToolCall(parsed.tool_call.name, parsed.tool_call.args);
           }
         }
       }

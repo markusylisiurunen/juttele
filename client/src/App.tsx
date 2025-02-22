@@ -3,8 +3,8 @@ import "./styles/globals.css";
 import { Rows3Icon, SquarePenIcon } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { API, ConfigResponse, DataResponse } from "./api";
+import { AnyBlock } from "./blocks";
 import { ChatHistory, MessageBox } from "./components";
-import { ChatHistoryItem } from "./entities";
 import { assertNever, atom, Atom, streamCompletion, useAtomWithSelector } from "./utils";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -46,42 +46,42 @@ type AppProps = {
 const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, onReset }) => {
   const [title, setTitle] = useState("");
   const [model, setModel] = useState<{ modelId: string; personalityId: string }>();
-  const [history, setHistory] = useState([] as ChatHistoryItem[]);
+  const [blocks, setBlocks] = useState([] as AnyBlock[]);
   useEffect(() => {
     const data = dataAtom.get();
     const chat = data.chats.find((chat) => chat.id === chatId);
     if (!chat) return;
     setTitle(chat.title);
-    const history = [] as ChatHistoryItem[];
+    const blocks = [] as AnyBlock[];
     for (const item of chat.history) {
       if (item.kind === "message" && item.data.role === "user") {
-        history.push({
-          id: Date.now().toString() + "_" + history.length,
+        blocks.push({
+          id: Date.now().toString() + "_" + blocks.length,
+          type: "text",
           role: "user",
           content: item.data.content,
         });
       }
       if (item.kind === "message" && item.data.role === "assistant") {
-        history.push({
-          id: Date.now().toString() + "_" + history.length,
+        blocks.push({
+          id: Date.now().toString() + "_" + blocks.length,
+          type: "text",
           role: "assistant",
           content: item.data.content,
         });
       }
     }
-    setHistory(history);
+    setBlocks(blocks);
   }, [chatId]);
   function onMessage(content: string) {
     const _model = model;
     if (!_model) return;
     const userId = Date.now().toString();
-    const assistantId = userId + "_assistant";
-    setHistory((history) => [...history, { id: userId, role: "user", content }]);
-    setHistory((history) => [...history, { id: assistantId, role: "assistant", content: "" }]);
+    let botId = userId + "_assistant";
+    setBlocks((h) => [...h, { id: userId, type: "text", role: "user", content }]);
+    setBlocks((h) => [...h, { id: botId, type: "text", role: "assistant", content: "" }]);
     void Promise.resolve().then(async () => {
       try {
-        const _history = history.map(({ role, content }) => ({ role, content }));
-        _history.push({ role: "user", content });
         await streamCompletion(
           BASE_URL,
           API_KEY,
@@ -89,44 +89,54 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
           _model.modelId,
           _model.personalityId,
           content,
-          (thinkingDelta) => {
-            setHistory((history) =>
-              history.map((i) => {
-                if (i.id === assistantId) {
-                  return { ...i, thinking: (i.thinking ?? "") + thinkingDelta };
-                }
-                return i;
-              })
-            );
+          () => {
+            // setBlocks((history) =>
+            //   history.map((i) => {
+            //     if (i.id === botId) {
+            //       return { ...i, thinking: (i.thinking ?? "") + thinkingDelta };
+            //     }
+            //     return i;
+            //   })
+            // );
           },
           (contentDelta) => {
-            setHistory((history) =>
+            setBlocks((history) =>
               history.map((i) => {
-                if (i.id === assistantId) {
+                if (i.id === botId && i.type === "text") {
                   return { ...i, content: i.content + contentDelta };
                 }
                 return i;
               })
             );
           },
+          (tool, args) => {
+            const id = Date.now().toString();
+            let _args: Record<string, unknown> = {};
+            try {
+              _args = JSON.parse(args);
+            } catch (error) {}
+            setBlocks((h) => [...h, { id: id, type: "tool_call", name: tool, args: _args }]);
+            botId = id + "_assistant";
+            setBlocks((h) => [...h, { id: botId, type: "text", role: "assistant", content: "" }]);
+          },
           (error) => {
-            setHistory((history) =>
-              history.map((item) => {
-                if (item.id === assistantId) {
-                  return { ...item, content: `Error: ${error}` };
+            setBlocks((history) =>
+              history.map((i) => {
+                if (i.id === botId && i.type === "text") {
+                  return { ...i, content: `Error: ${error}` };
                 }
-                return item;
+                return i;
               })
             );
           }
         );
       } catch (error) {
-        setHistory((history) =>
-          history.map((item) => {
-            if (item.id === assistantId) {
-              return { ...item, content: `Error: ${error}` };
+        setBlocks((history) =>
+          history.map((i) => {
+            if (i.id === botId && i.type === "text") {
+              return { ...i, content: `Error: ${error}` };
             }
-            return item;
+            return i;
           })
         );
       }
@@ -139,7 +149,7 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
     <>
       <AppHeader title={title} onChatsClick={onGoToChats} onNewChatClick={onReset} />
       <div className="app-container">
-        <ChatHistory history={history} />
+        <ChatHistory blocks={blocks} />
         <MessageBox
           configAtom={configAtom}
           onMessage={onMessage}

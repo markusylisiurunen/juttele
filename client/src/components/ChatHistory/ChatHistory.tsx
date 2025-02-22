@@ -1,115 +1,70 @@
-import { micromark } from "micromark";
-import React, { useEffect, useRef, useState } from "react";
-import { codeToHtml } from "shiki";
-import { ChatHistoryItem } from "../../entities";
+import React from "react";
+import { AnyBlock } from "../../blocks";
+import { Block } from "../Block/Block";
 import styles from "./ChatHistory.module.css";
 
-type ThinkingProps = {
-  thinking: string;
-};
-const _Thinking: React.FC<ThinkingProps> = ({ thinking }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className={styles.thinking}>
-      <div>
-        <span style={{ opacity: open ? 1 : 0.5 }}>Thinking process</span>
-        <button onClick={() => setOpen(!open)}>{open ? "Hide" : "Show"}</button>
-      </div>
-      {open ? <pre>{thinking}</pre> : null}
-    </div>
-  );
-};
-const Thinking = React.memo(_Thinking);
-
-type MessageProps = {
-  role: string;
-  thinking?: string;
-  content: string;
-};
-const _Message: React.FC<MessageProps> = ({ role, thinking, content }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!ref.current) return;
-      const pres = ref.current.querySelectorAll("& > pre");
-      for (const pre of Array.from(pres)) {
-        if (pre.classList.contains("shiki")) continue;
-        const code = pre.querySelector("& > code");
-        if (!code) continue;
-        const lang =
-          code
-            .getAttribute("class")
-            ?.split(" ")
-            .find((i) => i.startsWith("language-"))
-            ?.slice(9) ?? "plaintext";
-        codeToHtml(code.textContent || "", {
-          lang: lang,
-          theme: "github-dark-dimmed",
-        }).then((html) => {
-          const div = document.createElement("div");
-          div.innerHTML = html;
-          pre.replaceWith(div.firstChild!);
-        });
-      }
-    }, 200);
-    return () => clearTimeout(timeout);
-  }, [thinking, content]);
-  useEffect(() => {
-    const container = ref.current;
-    if (!container) return;
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (!(node instanceof HTMLElement && node.tagName === "PRE")) continue;
-          const code = node.querySelector("code");
-          if (!code) continue;
-          // add copy buttons (top and bottom)
-          for (const pos of [{ top: 8 }]) {
-            const btn = document.createElement("button");
-            btn.textContent = "Copy";
-            btn.style.top = pos.top ? `${pos.top}px` : "auto";
-            btn.classList.add("copy");
-            btn.addEventListener("click", () => {
-              const text = code.textContent;
-              if (!text) return;
-              navigator.clipboard.writeText(text);
-              btn.textContent = "Copied!";
-              setTimeout(() => {
-                btn.textContent = "Copy";
-              }, 2000);
-            });
-            node.appendChild(btn);
-          }
-        }
-      }
-    });
-    observer.observe(container, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [ref]);
-  return (
-    <>
-      {thinking ? <Thinking thinking={thinking} /> : null}
-      <div
-        ref={ref}
-        className={styles.message}
-        style={{ opacity: role === "user" ? 0.67 : 1 }}
-        dangerouslySetInnerHTML={{ __html: micromark(content) }}
-      />
-    </>
-  );
-};
-const Message = React.memo(_Message);
+// prettier-ignore
+const demoHistory: AnyBlock[] = [
+  {
+    id: "1",
+    type: "text",
+    role: "user",
+    content: "i need the latest news on AI",
+  },
+  {
+    id: "2",
+    type: "thinking",
+    content: "Thinking for 16 s...",
+  },
+  {
+    id: "4",
+    type: "text",
+    role: "assistant",
+    content: "Sure, I can help you with that. Please provide more details about the task you need assistance with.",
+  },
+  {
+    id: "5",
+    type: "tool_call",
+    name: "fetch_data",
+    args: {
+      query: "latest news on AI"
+    },
+  },
+  {
+    id: "6",
+    type: "text",
+    role: "assistant",
+    content: 'Here is the latest news on AI:\n\n## AI in Healthcare\n\nAI is revolutionizing healthcare by improving `diagnostics` and treatment plans. Recent advancements include AI-driven imaging `techniques` and personalized medicine.\n\n## AI in Finance\n\nFinancial institutions are leveraging AI for fraud detection, risk management, and personalized banking experiences. AI algorithms are also being used for high-frequency trading.\n\n## AI in Transportation\n\nSelf-driving cars and AI-powered traffic management systems are making transportation safer and more efficient. Companies like Tesla and Waymo are at the forefront of this innovation.\n\n```json\n{"ok":true}\n```',
+  },
+  {
+    id: "7",
+    type: "tool_call",
+    name: "summarize_text",
+    args: {
+      text: "AI is making significant strides in various industries, including healthcare, finance, and transportation. It is enhancing diagnostics, improving financial services, and making transportation safer.",
+    },
+  },
+];
 
 type ChatHistoryProps = {
-  history: ChatHistoryItem[];
+  blocks: AnyBlock[];
 };
-const ChatHistory: React.FC<ChatHistoryProps> = ({ history }) => {
+const ChatHistory: React.FC<ChatHistoryProps> = ({ blocks }) => {
   return (
     <div className={styles.root}>
       <div className={styles.history}>
-        {history.map((item) => (
-          <Message key={item.id} role={item.role} thinking={item.thinking} content={item.content} />
-        ))}
+        {blocks.map((i) => {
+          switch (i.type) {
+            case "text":
+              return <Block.Text key={i.id} block={i} />;
+            case "thinking":
+              return <Block.Thinking key={i.id} active={true} block={i} />;
+            case "tool_call":
+              return <Block.ToolCall key={i.id} block={i} />;
+            default:
+              return null;
+          }
+        })}
       </div>
     </div>
   );

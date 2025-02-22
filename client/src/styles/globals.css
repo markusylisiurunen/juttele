@@ -44,33 +44,42 @@ button {
   z-index: 999;
 
   --gradient-1: color-mix(in srgb, var(--color-bg) 100%, transparent);
-  --gradient-2: color-mix(in srgb, var(--color-bg) 97%, transparent);
-  --gradient-3: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  --gradient-2: color-mix(in srgb, var(--color-bg) 98%, transparent);
+  --gradient-3: color-mix(in srgb, var(--color-bg) 94%, transparent);
   --gradient-4: color-mix(in srgb, var(--color-bg) 0%, transparent);
   background: linear-gradient(
     to bottom,
     var(--gradient-1) 0%,
     var(--gradient-2) 50%,
-    var(--gradient-3) 67%,
+    var(--gradient-3) 75%,
     var(--gradient-4) 100%
   );
 }
 .app-header > div {
   align-items: center;
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 .app-header button {
+  --color-accent: hsl(284, 0%, 25%);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-accent) 20%, transparent),
+    color-mix(in srgb, var(--color-accent) 6%, transparent)
+  );
+
   align-items: center;
+  appearance: none;
   border-radius: 50%;
-  border: 1.5px solid color-mix(in srgb, var(--color-text) 6%, transparent);
-  height: 36px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+  color: var(--color-text);
+  height: 32px;
   justify-content: center;
-  transition: border 120ms linear;
-  width: 36px;
+  transition: border-color 90ms linear, color 90ms linear;
+  width: 32px;
 }
 .app-header button:hover {
-  border-color: color-mix(in srgb, var(--color-text) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 67%, transparent);
 }
 .app-container {
   display: flex;
@@ -98,7 +107,7 @@ button {
   border: 1.5px solid color-mix(in srgb, var(--color-text) 2%, transparent);
   padding-block: 8px;
   padding-inline: 12px;
-  transition: border 120ms linear;
+  transition: border 90ms linear;
 }
 .chat-list button:hover {
   border-color: color-mix(in srgb, var(--color-text) 12%, transparent);

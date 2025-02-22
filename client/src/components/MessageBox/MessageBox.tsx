@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { WrenchIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { ConfigResponse } from "../../api";
 import { Atom, useAtomWithSelector } from "../../utils";
@@ -14,6 +15,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ configAtom, onMessage, onContro
   type Personality = Model["personalities"][number];
   const [model, setModel] = useState<Model>();
   const [personality, setPersonality] = useState<Personality>();
+  const [tools, setTools] = useState(false);
   const options = useAtomWithSelector(configAtom, (config) => config.models);
   useEffect(() => {
     if (!model || !personality) return;
@@ -66,8 +68,15 @@ const MessageBox: React.FC<MessageBoxProps> = ({ configAtom, onMessage, onContro
         <textarea ref={textareaRef} rows={1} placeholder="Ask anything" onKeyDown={onKeyDown} />
       </div>
       <div className={styles.footer}>
-        <button onClick={onModelChangeClick}>{model?.name}</button>
-        <button onClick={onPersonalityChangeClick}>{personality?.name}</button>
+        <div>
+          <button data-active={tools ? "" : undefined} onClick={() => setTools((t) => !t)}>
+            <WrenchIcon size={14} />
+            <span>Tools</span>
+          </button>
+          <button onClick={onModelChangeClick}>{model?.name}</button>
+          <button onClick={onPersonalityChangeClick}>{personality?.name}</button>
+        </div>
+        <div></div>
       </div>
     </div>
   );
