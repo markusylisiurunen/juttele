@@ -75,6 +75,7 @@ type AppProps = {
   onReset: () => void;
 };
 const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, onReset }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [title, setTitle] = useState("");
   const [model, setModel] = useState<{ modelId: string; personalityId: string }>();
   const [blocks, setBlocks] = useState([] as AnyBlock[]);
@@ -111,6 +112,7 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
     let botId = userId + "_assistant";
     setBlocks((h) => [...h, { id: userId, type: "text", role: "user", content }]);
     setBlocks((h) => [...h, { id: botId, type: "text", role: "assistant", content: "" }]);
+    requestAnimationFrame(() => scrollRef.current?.scrollBy({ top: 1000, behavior: "smooth" }));
     void Promise.resolve().then(async () => {
       try {
         await streamCompletion(
@@ -188,7 +190,7 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
     <>
       <AppHeader title={title} onChatsClick={onGoToChats} onNewChatClick={onReset} />
       <div className="app-container">
-        <ChatHistory blocks={blocks} />
+        <ChatHistory scrollRef={scrollRef} blocks={blocks} />
         <MessageBox
           configAtom={configAtom}
           onMessage={onMessage}
