@@ -1,6 +1,6 @@
 import "./styles/globals.css";
 
-import { Rows3Icon, SquarePenIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, Rows3Icon, SquarePenIcon } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { API, ConfigResponse, DataResponse } from "./api";
 import { AnyBlock } from "./blocks";
@@ -15,9 +15,21 @@ const API_KEY = import.meta.env.VITE_API_KEY;
 type AppHeaderProps = {
   title: string;
   onChatsClick: () => void;
+  onCopyChatClick: () => void;
   onNewChatClick: () => void;
 };
-const AppHeader: React.FC<AppHeaderProps> = ({ title, onChatsClick, onNewChatClick }) => {
+const AppHeader: React.FC<AppHeaderProps> = ({
+  title,
+  onChatsClick,
+  onCopyChatClick,
+  onNewChatClick,
+}) => {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = setTimeout(() => setCopied(false), 500);
+    return () => clearTimeout(timeout);
+  }, [copied]);
   const BLUR_SEGMENTS = 8;
   return (
     <div className="app-header">
@@ -58,6 +70,14 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, onChatsClick, onNewChatCli
         <span>{title}</span>
       </div>
       <div>
+        <button
+          onClick={() => {
+            onCopyChatClick();
+            setCopied(true);
+          }}
+        >
+          {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
+        </button>
         <button onClick={onNewChatClick}>
           <SquarePenIcon size={16} />
         </button>
@@ -183,12 +203,29 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
       }
     });
   }
+  function onCopyChatClick() {
+    const segments = [] as string[];
+    for (const block of blocks) {
+      if (block.type === "text") {
+        let text = "";
+        text += `<!-- ${block.role.toUpperCase()} -->\n`;
+        text += block.content.trim();
+        segments.push(text);
+      }
+    }
+    navigator.clipboard.writeText(segments.join("\n\n"));
+  }
   function onControlModelChange(modelId: string, personalityId: string) {
     setModel({ modelId, personalityId });
   }
   return (
     <>
-      <AppHeader title={title} onChatsClick={onGoToChats} onNewChatClick={onReset} />
+      <AppHeader
+        title={title}
+        onChatsClick={onGoToChats}
+        onCopyChatClick={onCopyChatClick}
+        onNewChatClick={onReset}
+      />
       <div className="app-container">
         <ChatHistory scrollRef={scrollRef} blocks={blocks} />
         <MessageBox
