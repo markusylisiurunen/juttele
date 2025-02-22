@@ -39,7 +39,7 @@ func (r *Repository) ListChats(ctx context.Context) (ListChatsResult, error) {
 		if err := rows.Scan(&item.ID, &createdAt, &item.Title); err != nil {
 			return ListChatsResult{}, err
 		}
-		item.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+		item.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
 		if err != nil {
 			return ListChatsResult{}, err
 		}

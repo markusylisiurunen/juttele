@@ -28,7 +28,7 @@ func (r *Repository) CreateChat(ctx context.Context, args CreateChatArgs) (int64
 	values (?, ?, ?)
 	`
 	res, err := r.db.ExecContext(ctx, createNewQuery,
-		time.Now().UTC().Format(time.RFC3339), args.Title, false)
+		time.Now().UTC().Format(time.RFC3339Nano), args.Title, false)
 	if err != nil {
 		return 0, err
 	}

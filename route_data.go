@@ -49,7 +49,7 @@ func (app *App) dataRouteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		var vi dataResponseChat
 		vi.ID = chat.ID
-		vi.CreatedAt = chat.CreatedAt.Format(time.RFC3339)
+		vi.CreatedAt = chat.CreatedAt.Format(time.RFC3339Nano)
 		vi.Title = chat.Title
 		vi.History = make([]dataResponseHistoryItem, 0, len(events.Items))
 		for _, i := range events.Items {

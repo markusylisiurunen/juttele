@@ -24,7 +24,7 @@ func (r *Repository) ListChatEvents(ctx context.Context, args ListChatEventsArgs
 	select chat_event_created_at, chat_event_uuid, chat_event_kind, chat_event_content
 	from chat_events
 	where chat_id = ?
-	order by chat_event_created_at asc
+	order by chat_event_created_at asc, chat_event_id asc
 	`
 	rows, err := r.db.QueryContext(ctx, query, args.ChatID)
 	if err != nil {
@@ -48,7 +48,7 @@ func (r *Repository) ListChatEvents(ctx context.Context, args ListChatEventsArgs
 		if err := rows.Scan(&createdAt, &item.UUID, &item.Kind, &item.Content); err != nil {
 			return ListChatEventsResult{}, err
 		}
-		item.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+		item.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
 		if err != nil {
 			return ListChatEventsResult{}, err
 		}

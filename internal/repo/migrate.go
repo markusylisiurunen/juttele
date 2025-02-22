@@ -69,7 +69,7 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 		insert into schema_versions (version, applied_at) values (?, ?)
 		`
 		if _, err := tx.ExecContext(ctx, insertVersionQuery,
-			migration.version, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			migration.version, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
 			return fmt.Errorf("error updating schema_versions: %w", err)
 		}
 	}

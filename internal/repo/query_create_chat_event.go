@@ -19,7 +19,7 @@ func (r *Repository) CreateChatEvent(ctx context.Context, args CreateChatEventAr
 	values (?, ?, ?, ?, ?)
 	`
 	res, err := r.db.ExecContext(ctx, query,
-		args.ChatID, time.Now().UTC().Format(time.RFC3339), args.UUID, args.Kind, args.Content)
+		args.ChatID, time.Now().UTC().Format(time.RFC3339Nano), args.UUID, args.Kind, args.Content)
 	if err != nil {
 		return 0, err
 	}
