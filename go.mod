@@ -4,6 +4,7 @@ go 1.23.5
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0
+	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/tidwall/gjson v1.18.0
 )

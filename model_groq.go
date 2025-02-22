@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -83,74 +84,98 @@ func (m *groqModel) GetModelInfo() ModelInfo {
 	}
 }
 
-func (m *groqModel) StreamCompletion(ctx context.Context, history []Message) <-chan Chunk {
-	return streamOpenAICompatibleCompletion(ctx,
-		func(ctx context.Context) (*http.Response, error) {
-			type reqBodyMessage struct {
-				Role    string `json:"role"`
-				Content string `json:"content"`
-			}
-			type reqBody struct {
-				Model           string           `json:"model"`
-				Messages        []reqBodyMessage `json:"messages"`
-				Stream          bool             `json:"stream"`
-				MaxTokens       int              `json:"max_tokens"`
-				Temperature     float64          `json:"temperature"`
-				ReasoningFormat string           `json:"reasoning_format"`
-			}
-			b := reqBody{
-				Model:           m.modelName,
-				Messages:        make([]reqBodyMessage, len(history)),
-				Stream:          true,
-				MaxTokens:       4096,
-				Temperature:     0.6,
-				ReasoningFormat: "parsed",
-			}
-			for i, msg := range history {
-				b.Messages[i] = reqBodyMessage{
-					Role:    string(msg.GetRole()),
-					Content: msg.GetContent(),
+func (m *groqModel) StreamCompletion(ctx context.Context, systemPrompt string, history []ChatEvent) <-chan ChatEvent {
+	out := make(chan ChatEvent)
+	go func() {
+		defer close(out)
+		chunks := callOpenAICompatibleAPI(ctx,
+			func(ctx context.Context) (*http.Response, error) {
+				type reqBodyMessage struct {
+					Role    string `json:"role"`
+					Content string `json:"content"`
 				}
+				type reqBody struct {
+					Messages        []reqBodyMessage `json:"messages"`
+					Model           string           `json:"model"`
+					ReasoningFormat string           `json:"reasoning_format"`
+					Stream          bool             `json:"stream"`
+					Temperature     float64          `json:"temperature"`
+				}
+				b := reqBody{
+					Messages:        make([]reqBodyMessage, 0),
+					Model:           m.modelName,
+					ReasoningFormat: "parsed",
+					Stream:          true,
+					Temperature:     0.6,
+				}
+				if systemPrompt != "" {
+					b.Messages = append(b.Messages, reqBodyMessage{
+						Role:    "system",
+						Content: systemPrompt,
+					})
+				}
+				for _, i := range history {
+					switch i := i.(type) {
+					case *AssistantMessageChatEvent:
+						b.Messages = append(b.Messages, reqBodyMessage{
+							Role:    "assistant",
+							Content: i.content,
+						})
+					case *UserMessageChatEvent:
+						b.Messages = append(b.Messages, reqBodyMessage{
+							Role:    "user",
+							Content: i.content,
+						})
+					}
+				}
+				body, err := json.Marshal(b)
+				if err != nil {
+					return nil, err
+				}
+				req, err := http.NewRequestWithContext(ctx,
+					http.MethodPost, "https://api.groq.com/openai/v1/chat/completions",
+					bytes.NewReader(body),
+				)
+				if err != nil {
+					return nil, err
+				}
+				req.Header.Set("Authorization", "Bearer "+m.apiKey)
+				req.Header.Set("Content-Type", "application/json")
+				return http.DefaultClient.Do(req)
+			},
+		)
+		resp := NewAssistantMessageChatEvent("")
+		out <- resp
+		for r := range chunks {
+			if r.Err != nil {
+				fmt.Printf("error: %v\n", r.Err)
+				return
 			}
-			body, err := json.Marshal(b)
-			if err != nil {
-				return nil, err
-			}
-			req, err := http.NewRequestWithContext(ctx,
-				http.MethodPost, "https://api.groq.com/openai/v1/chat/completions",
-				bytes.NewReader(body),
-			)
-			if err != nil {
-				return nil, err
-			}
-			req.Header.Set("Authorization", "Bearer "+m.apiKey)
-			req.Header.Set("Content-Type", "application/json")
-			return http.DefaultClient.Do(req)
-		},
-		func(chunk []byte) (Chunk, error) {
 			type respBody struct {
 				Model   string `json:"model"`
 				Choices []struct {
 					Delta struct {
-						Content   *string `json:"content"`
 						Reasoning *string `json:"reasoning"`
+						Content   *string `json:"content"`
 					} `json:"delta"`
 				} `json:"choices"`
 			}
 			var b respBody
-			if err := json.Unmarshal([]byte(chunk), &b); err != nil {
-				return nil, err
+			if err := json.Unmarshal([]byte(r.Val), &b); err != nil {
+				fmt.Printf("error: %v\n", err)
+				return
 			}
 			if len(b.Choices) == 0 {
-				return nil, nil
+				return
 			}
 			if b.Choices[0].Delta.Reasoning != nil {
-				return ThinkingChunk(*b.Choices[0].Delta.Reasoning), nil
+				fmt.Printf("reasoning: %v\n", *b.Choices[0].Delta.Reasoning)
 			}
 			if b.Choices[0].Delta.Content != nil {
-				return ContentChunk(*b.Choices[0].Delta.Content), nil
+				resp.content += *b.Choices[0].Delta.Content
+				out <- resp
 			}
-			return nil, nil
-		},
-	)
+		}
+	}()
+	return out
 }

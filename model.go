@@ -12,31 +12,6 @@ import (
 	"github.com/markusylisiurunen/juttele/internal/util"
 )
 
-type chunkType string
-
-const (
-	errChunkType      chunkType = "error"
-	thinkingChunkType chunkType = "thinking"
-	contentChunkType  chunkType = "content"
-)
-
-type chunk struct {
-	t        chunkType
-	err      error
-	thinking string
-	content  string
-}
-
-func (c *chunk) getChunk() *chunk { return c }
-
-func ErrorChunk(v error) *chunk     { return &chunk{t: errChunkType, err: v} }
-func ThinkingChunk(v string) *chunk { return &chunk{t: thinkingChunkType, thinking: v} }
-func ContentChunk(v string) *chunk  { return &chunk{t: contentChunkType, content: v} }
-
-type Chunk interface {
-	getChunk() *chunk
-}
-
 type ModelPersonality struct {
 	ID           string
 	Name         string
@@ -51,15 +26,14 @@ type ModelInfo struct {
 
 type Model interface {
 	GetModelInfo() ModelInfo
-	StreamCompletion(ctx context.Context, history []Message) <-chan Chunk
+	StreamCompletion(ctx context.Context, systemPrompt string, history []ChatEvent) <-chan ChatEvent
 }
 
-func streamOpenAICompatibleCompletion(
+func callOpenAICompatibleAPI(
 	ctx context.Context,
 	sendRequest func(context.Context) (*http.Response, error),
-	processDataChunk func([]byte) (Chunk, error),
-) <-chan Chunk {
-	out, _ := util.SafeGo(ctx, func(ctx context.Context, vs chan<- Chunk, errs chan<- error) {
+) <-chan util.Result[[]byte] {
+	out, _ := util.SafeGo(ctx, func(ctx context.Context, vs chan<- []byte, errs chan<- error) {
 		resp, err := sendRequest(ctx)
 		if err != nil {
 			errs <- fmt.Errorf("request error: %w", err)
@@ -87,24 +61,8 @@ func streamOpenAICompatibleCompletion(
 			if line == "[DONE]" {
 				continue
 			}
-			chunk, err := processDataChunk([]byte(line))
-			if err != nil {
-				errs <- fmt.Errorf("process error: %w", err)
-				return
-			}
-			vs <- chunk
+			vs <- []byte(line)
 		}
 	})
-	ch := make(chan Chunk)
-	go func() {
-		defer close(ch)
-		for v := range out {
-			if v.Err != nil {
-				ch <- ErrorChunk(v.Err)
-				continue
-			}
-			ch <- v.Val
-		}
-	}()
-	return ch
+	return out
 }

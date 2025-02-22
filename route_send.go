@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/markusylisiurunen/juttele/internal/repo"
 	"github.com/markusylisiurunen/juttele/internal/util"
-	"github.com/tidwall/gjson"
 )
 
 type sendRequest struct {
@@ -58,24 +58,19 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("error listing chat events: %v", err), http.StatusInternalServerError)
 		return
 	}
-	history := make([]Message, 0, 1+len(events.Items))
-	if *systemPrompt != "" {
-		history = append(history, SystemMessage(*systemPrompt))
-	}
+	history := make([]ChatEvent, 0, 1+len(events.Items))
 	for _, i := range events.Items {
 		if !strings.HasPrefix(i.Kind, "message.") {
 			continue
 		}
-		switch i.Kind {
-		case "message.user":
-			content := gjson.GetBytes(i.Content, "content").String()
-			history = append(history, UserMessage(content))
-		case "message.assistant":
-			content := gjson.GetBytes(i.Content, "content").String()
-			history = append(history, AssistantMessage("", content))
+		event, err := parseChatEvent(i.CreatedAt, i.UUID, i.Kind, i.Content)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("error parsing chat event: %v", err), http.StatusInternalServerError)
+			return
 		}
+		history = append(history, event)
 	}
-	history = append(history, UserMessage(v.Content))
+	history = append(history, NewUserMessageChatEvent(v.Content))
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
@@ -88,28 +83,16 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		reasoning  strings.Builder
 		completion strings.Builder
 	)
-	chunks := model.StreamCompletion(r.Context(), history)
-	for i := range chunks {
+	out := model.StreamCompletion(r.Context(), *systemPrompt, history)
+	for i := range out {
 		if i == nil {
 			continue
 		}
-		chunk := i.getChunk()
-		if chunk.t == errChunkType {
-			data := map[string]string{"error": chunk.err.Error()}
-			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(data)))
-			flusher.Flush()
-			return
-		}
-		if chunk.t == thinkingChunkType {
-			reasoning.WriteString(chunk.thinking)
-			data := map[string]string{"thinking": chunk.thinking}
-			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(data)))
-			flusher.Flush()
-			continue
-		}
-		if chunk.t == contentChunkType {
-			completion.WriteString(chunk.content)
-			data := map[string]string{"content": chunk.content}
+		switch i := i.(type) {
+		case *AssistantMessageChatEvent:
+			data := map[string]string{"content": i.content[completion.Len():]}
+			completion.Reset()
+			completion.WriteString(i.content)
 			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(data)))
 			flusher.Flush()
 			continue
@@ -117,6 +100,7 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
 		ChatID:  chatID,
+		UUID:    uuid.Must(uuid.NewV7()).String(),
 		Kind:    "message.user",
 		Content: util.Must(json.Marshal(map[string]any{"content": v.Content})),
 	}); err != nil {
@@ -126,6 +110,7 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 	if reasoning.Len() > 0 {
 		if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
 			ChatID:  chatID,
+			UUID:    uuid.Must(uuid.NewV7()).String(),
 			Kind:    "other.reasoning",
 			Content: util.Must(json.Marshal(map[string]any{"content": reasoning.String()})),
 		}); err != nil {
@@ -136,6 +121,7 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 	if completion.Len() > 0 {
 		if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
 			ChatID:  chatID,
+			UUID:    uuid.Must(uuid.NewV7()).String(),
 			Kind:    "message.assistant",
 			Content: util.Must(json.Marshal(map[string]any{"content": completion.String()})),
 		}); err != nil {

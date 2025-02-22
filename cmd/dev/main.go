@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/markusylisiurunen/juttele"
 )
@@ -19,6 +21,10 @@ func main() {
 		openRouterToken = os.Getenv("OPEN_ROUTER_TOKEN")
 	)
 	var (
+		gpt4o = juttele.NewOpenRouterModel(openRouterToken, "openai/gpt-4o-2024-11-20",
+			juttele.WithOpenRouterModelDisplayName("GPT-4o"),
+			juttele.WithOpenRouterModelPersonality("Neutral", neutralSystemPrompt),
+		)
 		claude35Sonnet = juttele.NewOpenRouterModel(openRouterToken, "anthropic/claude-3.5-sonnet:beta",
 			juttele.WithOpenRouterModelDisplayName("Claude 3.5 Sonnet"),
 			juttele.WithOpenRouterModelPersonality("Neutral", neutralSystemPrompt),
@@ -33,11 +39,23 @@ func main() {
 		)
 	)
 	app := juttele.New("YOUR_TOKEN_HERE",
+		juttele.WithModel(gpt4o),
 		juttele.WithModel(claude35Sonnet),
 		juttele.WithModel(deepseekR1Llama70b),
 		juttele.WithModel(gemini20FlashThinking),
 	)
-	if err := app.ListenAndServe(context.Background()); err != nil {
-		fmt.Printf("error: %v\n", err)
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if err := app.ListenAndServe(ctx); err != nil {
+			fmt.Printf("error: %v\n", err)
+		}
+	}()
+	<-c
+	cancel()
+	<-done
 }
