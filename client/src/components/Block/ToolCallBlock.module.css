@@ -7,6 +7,9 @@
 .root {
   --color-accent: hsl(284, 0%, 25%);
 }
+.root:where([data-active]) .block {
+  --color-accent: hsl(265, 100%, 60%);
+}
 .block {
   background: linear-gradient(
     to bottom,
@@ -23,6 +26,13 @@
   overflow: hidden;
   padding-block: 5px;
   padding-inline: 6px 12px;
+  transition: background 200ms linear, box-shadow 200ms linear, border 200ms linear;
+}
+.root:not(:where([data-active])) .block {
+  box-shadow: 0 0 0 0 transparent;
+}
+.root:where([data-active]) .block {
+  box-shadow: 0 0 16px 0 color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 .block > svg {
   color: color-mix(in srgb, var(--color-text) 50%, var(--color-accent));

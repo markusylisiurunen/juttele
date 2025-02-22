@@ -53,14 +53,14 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ blocks }) => {
   return (
     <div className={styles.root}>
       <div className={styles.history}>
-        {blocks.map((i) => {
+        {blocks.map((i, idx) => {
           switch (i.type) {
             case "text":
               return <Block.Text key={i.id} block={i} />;
             case "thinking":
-              return <Block.Thinking key={i.id} active={true} block={i} />;
+              return <Block.Thinking key={i.id} active={idx === blocks.length - 1} block={i} />;
             case "tool_call":
-              return <Block.ToolCall key={i.id} block={i} />;
+              return <Block.ToolCall key={i.id} active={idx === blocks.length - 1} block={i} />;
             default:
               return null;
           }

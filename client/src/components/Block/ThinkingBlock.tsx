@@ -1,5 +1,5 @@
 import { BrainIcon } from "lucide-react";
-import React from "react";
+import React, { useMemo } from "react";
 import { ThinkingBlock } from "../../blocks";
 import styles from "./Thinking.module.css";
 
@@ -8,11 +8,15 @@ type ThinkingComponentProps = {
   block: ThinkingBlock;
 };
 const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ active, block }) => {
+  const beginAt = useMemo(() => Date.now(), []);
+  const thoughtForSeconds = `${Math.round((Date.now() - beginAt) / 1000)} s`;
   return (
     <div className={styles.root} data-block="thinking" data-active={active ? "" : undefined}>
       <div className={styles.block}>
         <BrainIcon size={16} />
-        <span>{block.content}</span>
+        <span>
+          {active ? `Thinking for ${thoughtForSeconds}...` : `Thought for ${thoughtForSeconds}`}
+        </span>
       </div>
     </div>
   );

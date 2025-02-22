@@ -3,10 +3,19 @@ import React, { useEffect, useState } from "react";
 import { ToolCallBlock } from "../../blocks";
 import styles from "./ToolCallBlock.module.css";
 
+function tryOr<T>(fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
+}
+
 type ToolCallComponentProps = {
+  active: boolean;
   block: ToolCallBlock;
 };
-const ToolCallComponent: React.FC<ToolCallComponentProps> = ({ block }) => {
+const ToolCallComponent: React.FC<ToolCallComponentProps> = ({ active, block }) => {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
@@ -14,15 +23,16 @@ const ToolCallComponent: React.FC<ToolCallComponentProps> = ({ block }) => {
     return () => clearTimeout(timeout);
   }, [copied]);
   function onCopy() {
-    navigator.clipboard.writeText(JSON.stringify(block.args, null, 2));
+    const text = tryOr(() => JSON.stringify(JSON.parse(block.args), null, 2), block.args);
+    navigator.clipboard.writeText(text);
     setCopied(true);
   }
   return (
-    <div className={styles.root} data-block="tool-call">
+    <div className={styles.root} data-block="tool-call" data-active={active ? "" : undefined}>
       <div className={styles.block}>
         <BracesIcon size={16} />
         <span>
-          {block.name}({JSON.stringify(block.args)})
+          {block.name}({tryOr(() => JSON.stringify(JSON.parse(block.args)), block.args)})
         </span>
       </div>
       <button className={styles.copy} disabled={copied} onClick={onCopy}>
@@ -33,6 +43,7 @@ const ToolCallComponent: React.FC<ToolCallComponentProps> = ({ block }) => {
 };
 const MemoedToolCallComponent = React.memo(ToolCallComponent, (prev, next) => {
   if (prev.block.id !== next.block.id) return false;
+  if (prev.active !== next.active) return false;
   if (prev.block.name !== next.block.name) return false;
   if (prev.block.args !== next.block.args) return false;
   return true;

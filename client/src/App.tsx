@@ -89,35 +89,43 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
           _model.modelId,
           _model.personalityId,
           content,
-          () => {
-            // setBlocks((history) =>
-            //   history.map((i) => {
-            //     if (i.id === botId) {
-            //       return { ...i, thinking: (i.thinking ?? "") + thinkingDelta };
-            //     }
-            //     return i;
-            //   })
-            // );
+          (thinkingDelta) => {
+            setBlocks((blocks) => {
+              const last = blocks.at(-1);
+              if (last?.type !== "thinking") {
+                const id = Date.now().toString() + "_thinking";
+                blocks = [...blocks, { id: id, type: "thinking", content: "" }];
+              }
+              return blocks.map((i, idx) => {
+                if (idx !== blocks.length - 1 || i.type !== "thinking") return i;
+                return { ...i, content: i.content + thinkingDelta };
+              });
+            });
           },
           (contentDelta) => {
-            setBlocks((history) =>
-              history.map((i) => {
+            setBlocks((blocks) => {
+              const last = blocks.at(-1);
+              if (last?.type !== "text") {
+                botId = Date.now().toString() + "_assistant";
+                blocks = [...blocks, { id: botId, type: "text", role: "assistant", content: "" }];
+              }
+              return blocks.map((i) => {
                 if (i.id === botId && i.type === "text") {
                   return { ...i, content: i.content + contentDelta };
                 }
                 return i;
-              })
-            );
+              });
+            });
           },
           (tool, args) => {
-            const id = Date.now().toString();
-            let _args: Record<string, unknown> = {};
-            try {
-              _args = JSON.parse(args);
-            } catch (error) {}
-            setBlocks((h) => [...h, { id: id, type: "tool_call", name: tool, args: _args }]);
-            botId = id + "_assistant";
-            setBlocks((h) => [...h, { id: botId, type: "text", role: "assistant", content: "" }]);
+            setBlocks((blocks) => {
+              const last = blocks.at(-1);
+              if (last?.type === "tool_call") {
+                return [...blocks.slice(0, -1), { ...last, name: tool, args: args }];
+              }
+              const id = Date.now().toString() + "_tool";
+              return [...blocks, { id: id, type: "tool_call", name: tool, args: args }];
+            });
           },
           (error) => {
             setBlocks((history) =>

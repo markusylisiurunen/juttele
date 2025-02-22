@@ -3,7 +3,7 @@
   justify-content: flex-start;
   padding-inline: var(--spacing-padding-x);
 }
-.root:not(:where([data-active])) {
+.root {
   --color-accent: hsl(284, 0%, 25%);
 }
 .root:where([data-active]) {

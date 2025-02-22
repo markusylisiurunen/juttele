@@ -1,8 +1,17 @@
 import React, { useEffect, useRef } from "react";
 import Markdown from "react-markdown";
+import rehypeKatex from "rehype-katex";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import { codeToHtml } from "shiki";
 import { TextBlock } from "../../blocks";
 import styles from "./TextBlock.module.css";
+
+const preprocessLaTeX = (content: string) => {
+  content = content.replace(/\\\[(.*?)\\\]/gs, (_, eq) => `$$${eq}$$`);
+  content = content.replace(/\\\((.*?)\\\)/gs, (_, eq) => `$${eq}$`);
+  return content;
+};
 
 type TextComponentProps = {
   block: TextBlock;
@@ -42,7 +51,19 @@ const TextComponent: React.FC<TextComponentProps> = ({ block }) => {
         className={styles.content}
         style={{ opacity: block.role === "user" ? 0.5 : undefined }}
       >
-        <Markdown>{block.content}</Markdown>
+        <Markdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
+          components={{
+            table: ({ children }) => (
+              <div>
+                <table>{children}</table>
+              </div>
+            ),
+          }}
+        >
+          {preprocessLaTeX(block.content)}
+        </Markdown>
       </div>
     </div>
   );

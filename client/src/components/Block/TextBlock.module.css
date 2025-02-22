@@ -71,6 +71,12 @@
 .content hr {
   margin-block: var(--gap-md);
 }
+.content div:has(> table) {
+  margin-block: var(--gap-md);
+}
+.content :global(.katex-display) {
+  margin-block: calc(1.5 * var(--gap-md));
+}
 /* dividers */
 .content hr {
   border-block-end: none;
@@ -108,6 +114,48 @@
   position: absolute;
   top: 0px;
   width: 3px;
+}
+/* checkbox */
+.content input[type="checkbox"] {
+  background: color-mix(in srgb, var(--color-text) 5%, var(--color-bg));
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  box-shadow: none;
+  display: inline-block;
+  height: 15px;
+  margin: 0px;
+  width: 15px;
+}
+/* tables */
+.content div:has(> table) {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.content table {
+  --color-border: color-mix(in srgb, var(--color-text) 12%, var(--color-bg));
+  background: color-mix(in srgb, var(--color-text) 2%, transparent);
+  border-collapse: collapse;
+  border: none;
+  min-width: 100%;
+}
+.content table th,
+.content table td {
+  padding-inline: 8px;
+  padding-block: 6px;
+  text-align: left;
+}
+.content table th:not(:first-child),
+.content table td:not(:first-child) {
+  border-inline-start: 1px solid var(--color-border);
+}
+.content table th {
+  border-bottom: 1px solid var(--color-border);
+  font-weight: bold;
+  white-space: nowrap;
+}
+/* math */
+.content p :global(.katex) {
+  font-size: 1.1em;
 }
 /* inline code */
 .content :not(pre) > code {
