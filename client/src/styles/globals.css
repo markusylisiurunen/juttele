@@ -46,21 +46,30 @@ button {
   z-index: 999;
 
   --gradient-1: color-mix(in srgb, var(--color-bg) 100%, transparent);
-  --gradient-2: color-mix(in srgb, var(--color-bg) 98%, transparent);
-  --gradient-3: color-mix(in srgb, var(--color-bg) 94%, transparent);
-  --gradient-4: color-mix(in srgb, var(--color-bg) 0%, transparent);
+  --gradient-2: color-mix(in srgb, var(--color-bg) 67%, transparent);
+  --gradient-3: color-mix(in srgb, var(--color-bg) 0%, transparent);
   background: linear-gradient(
     to bottom,
-    var(--gradient-1) 0%,
-    var(--gradient-2) 50%,
-    var(--gradient-3) 75%,
-    var(--gradient-4) 100%
+    var(--gradient-1) 25%,
+    var(--gradient-2) 80%,
+    var(--gradient-3) 100%
   );
 }
-.app-header > div {
+.app-header .blur {
+  inset: 0px;
+  position: absolute;
+  z-index: 1;
+}
+.app-header .blur > div {
+  inset: 0px;
+  position: absolute;
+}
+.app-header > :not(.blur) {
   align-items: center;
   display: flex;
   gap: 8px;
+  position: relative;
+  z-index: 2;
 }
 .app-header button {
   --color-accent: hsl(284, 0%, 25%);

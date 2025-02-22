@@ -81,6 +81,7 @@
 .content hr {
   border-block-end: none;
   border-block-start: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-inline: none;
 }
 /* links */
 .content a {

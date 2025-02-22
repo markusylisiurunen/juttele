@@ -18,8 +18,39 @@ type AppHeaderProps = {
   onNewChatClick: () => void;
 };
 const AppHeader: React.FC<AppHeaderProps> = ({ title, onChatsClick, onNewChatClick }) => {
+  const BLUR_SEGMENTS = 8;
   return (
     <div className="app-header">
+      <div className="blur">
+        {Array.from({ length: BLUR_SEGMENTS }).map((_, i) => {
+          const MIN_BLUR = 0;
+          const MAX_BLUR = 24;
+          const blur = MIN_BLUR + (MAX_BLUR - MIN_BLUR) * (1 - i / (BLUR_SEGMENTS - 1));
+          let gradCenter = (i / (BLUR_SEGMENTS - 1)) * 100;
+          gradCenter *= 1 - 0.16;
+          const d = 8;
+          const grad1 = Math.max(0, gradCenter - 2 * d);
+          const grad2 = Math.max(0, gradCenter - 1 * d);
+          const grad3 = Math.min(100, gradCenter + 1 * d);
+          const grad4 = Math.min(100, gradCenter + 2 * d);
+          return (
+            <div
+              key={i}
+              style={{
+                backdropFilter: `blur(${blur}px)`,
+                zIndex: 1,
+                mask: `linear-gradient(${[
+                  "to bottom",
+                  `rgba(0,0,0,0) ${grad1}%`,
+                  `rgba(0,0,0,1) ${grad2}%`,
+                  `rgba(0,0,0,1) ${grad3}%`,
+                  `rgba(0,0,0,0) ${grad4}%`,
+                ].join(", ")})`,
+              }}
+            />
+          );
+        })}
+      </div>
       <div>
         <button onClick={onChatsClick}>
           <Rows3Icon size={16} />
