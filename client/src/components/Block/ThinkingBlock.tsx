@@ -7,7 +7,7 @@ type ThinkingComponentProps = {
   active: boolean;
   block: ThinkingBlock;
 };
-const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ active, block }) => {
+const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ active }) => {
   const beginAt = useMemo(() => Date.now(), []);
   const thoughtForSeconds = `${Math.round((Date.now() - beginAt) / 1000)} s`;
   return (
