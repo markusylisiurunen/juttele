@@ -1,8 +1,10 @@
 .root {
+  padding-inline: var(--spacing-padding-x);
+}
+.container {
   align-items: center;
   display: flex;
   justify-content: flex-start;
-  padding-inline: var(--spacing-padding-x);
 }
 .root {
   --color-accent: hsl(284, 0%, 25%);
@@ -63,4 +65,15 @@
 }
 .copy:hover {
   color: var(--color-text);
+}
+.preview {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+  font-size: 14px;
+  margin-block-start: 0.67em;
+}
+.preview p {
+  margin-block: 0px;
+}
+.preview p + p {
+  margin-block-start: 0.67em;
 }

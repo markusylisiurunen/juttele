@@ -22,15 +22,24 @@ const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ active, block }) 
   }
   return (
     <div className={styles.root} data-block="thinking" data-active={active ? "" : undefined}>
-      <div className={styles.block}>
-        <BrainIcon size={16} />
-        <span>
-          {active ? `Thinking for ${thoughtForSeconds}...` : `Thought for ${thoughtForSeconds}`}
-        </span>
+      <div className={styles.container}>
+        <div className={styles.block}>
+          <BrainIcon size={16} />
+          <span>
+            {active ? `Thinking for ${thoughtForSeconds}...` : `Thought for ${thoughtForSeconds}`}
+          </span>
+        </div>
+        <button className={styles.copy} disabled={copied} onClick={onCopy}>
+          {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
+        </button>
       </div>
-      <button className={styles.copy} disabled={copied} onClick={onCopy}>
-        {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
-      </button>
+      {active ? (
+        <div className={styles.preview}>
+          {block.content.split("\n").map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 };
