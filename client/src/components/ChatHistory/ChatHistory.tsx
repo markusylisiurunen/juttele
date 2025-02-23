@@ -42,29 +42,34 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ scrollRef, blocks }) => {
   return (
     <div className={styles.root}>
       <div className={styles.history} ref={scrollRef}>
-        {blocks.flatMap((i, idx) => {
-          const prev = idx === 0 ? null : blocks[idx - 1] ?? null;
-          switch (i.type) {
-            case "text":
-              if (i.content.trim() === "") return [];
-              return [
-                <Divider key={i.id + "_divider"} prev={prev} next={i} />,
-                <Block.Text key={i.id} block={i} />,
-              ];
-            case "thinking":
-              return [
-                <Divider key={i.id + "_divider"} prev={prev} next={i} />,
-                <Block.Thinking key={i.id} active={idx === blocks.length - 1} block={i} />,
-              ];
-            case "tool_call":
-              return [
-                <Divider key={i.id + "_divider"} prev={prev} next={i} />,
-                <Block.ToolCall key={i.id} active={idx === blocks.length - 1} block={i} />,
-              ];
-            default:
-              return null;
-          }
-        })}
+        {blocks
+          .filter((i) => {
+            if (i.type === "text" && i.content.trim() === "") return false;
+            return true;
+          })
+          .flatMap((i, idx) => {
+            const prev = idx === 0 ? null : blocks[idx - 1] ?? null;
+            switch (i.type) {
+              case "text":
+                if (i.content.trim() === "") return [];
+                return [
+                  <Divider key={i.id + "_divider"} prev={prev} next={i} />,
+                  <Block.Text key={i.id} block={i} />,
+                ];
+              case "thinking":
+                return [
+                  <Divider key={i.id + "_divider"} prev={prev} next={i} />,
+                  <Block.Thinking key={i.id} active={idx === blocks.length - 1} block={i} />,
+                ];
+              case "tool_call":
+                return [
+                  <Divider key={i.id + "_divider"} prev={prev} next={i} />,
+                  <Block.ToolCall key={i.id} active={idx === blocks.length - 1} block={i} />,
+                ];
+              default:
+                return null;
+            }
+          })}
       </div>
     </div>
   );
