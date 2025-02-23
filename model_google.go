@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/markusylisiurunen/juttele/internal/util"
@@ -106,8 +108,12 @@ func (m *googleModel) StreamCompletion(ctx context.Context, systemPrompt string,
 				}
 				// add system instructions if they exist
 				if systemPrompt != "" {
+					loc, _ := time.LoadLocation("Europe/Helsinki")
+					now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
 					b.SystemInstruction = &reqContent{
-						Parts: []reqContentPart{{Text: systemPrompt}},
+						Parts: []reqContentPart{
+							{Text: strings.ReplaceAll(systemPrompt, "{{current_time}}", now)},
+						},
 					}
 				}
 				// add the message history

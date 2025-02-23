@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/markusylisiurunen/juttele/internal/util"
@@ -109,9 +111,11 @@ func (m *groqModel) StreamCompletion(ctx context.Context, systemPrompt string, h
 					Temperature:     0.6,
 				}
 				if systemPrompt != "" {
+					loc, _ := time.LoadLocation("Europe/Helsinki")
+					now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
 					b.Messages = append(b.Messages, reqBodyMessage{
 						Role:    "system",
-						Content: systemPrompt,
+						Content: strings.ReplaceAll(systemPrompt, "{{current_time}}", now),
 					})
 				}
 				for _, i := range history {
