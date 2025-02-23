@@ -65,7 +65,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         {/* make sure the blur doesn't bleed from the top */}
         <div
           style={{
-            background: "linear-gradient(to bottom, var(--color-bg) 0%, transparent 20%)",
+            background: "linear-gradient(to bottom, var(--color-bg) 0%, transparent 33%)",
             zIndex: 99,
           }}
         />

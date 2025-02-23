@@ -1,5 +1,6 @@
 .root {
   padding-inline: var(--spacing-padding-x);
+  position: relative;
 }
 .actions {
   --color-accent: hsl(284, 0%, 20%);
@@ -9,14 +10,28 @@
     color-mix(in srgb, var(--color-accent) 6%, transparent)
   );
 
+  --gap: 4px;
   align-items: center;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+  bottom: 0px;
   display: inline-flex;
+  left: var(--spacing-padding-x);
   margin-block-start: 8px;
   margin-inline-start: -4px;
   padding-block: 1px;
   padding-inline: 4px 6px;
+  position: absolute;
+  transform: translateY(calc(100% + var(--gap)));
+  z-index: 999;
+}
+.actions::before {
+  content: "";
+  height: calc(2 * var(--gap));
+  left: 0px;
+  position: absolute;
+  right: 0px;
+  top: calc(-1 * 2 * var(--gap));
 }
 .actions button {
   color: color-mix(in srgb, var(--color-text) 33%, transparent);
@@ -38,6 +53,9 @@
 }
 .actions:hover span {
   color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.root:not(:hover) .actions {
+  display: none;
 }
 /* spacing within messages */
 .content {

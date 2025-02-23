@@ -35,22 +35,24 @@ const TextComponent: React.FC<TextComponentProps> = ({ block }) => {
           {preprocessLaTeX(block.content)}
         </Markdown>
       </div>
-      <div className={styles.actions}>
-        <button
-          onClick={() => {
-            navigator.clipboard.writeText(block.content.trim() + "\n");
-            setCopied(true);
-          }}
-        >
-          {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-        </button>
-        <button>
-          <RotateCwIcon size={13} />
-        </button>
-        <span>
-          {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}
-        </span>
-      </div>
+      {block.role === "assistant" ? (
+        <div className={styles.actions}>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(block.content.trim() + "\n");
+              setCopied(true);
+            }}
+          >
+            {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+          </button>
+          <button>
+            <RotateCwIcon size={13} />
+          </button>
+          <span>
+            {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 };
