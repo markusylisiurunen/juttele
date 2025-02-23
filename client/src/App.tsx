@@ -143,29 +143,33 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
     setBlocks(blocks);
   }, [chatId]);
   function onMessage(content: string) {
-    const _model = model;
-    if (!_model) return;
-    const userId = Date.now().toString();
-    setBlocks((h) => [...h, { id: userId, type: "text", role: "user", content }]);
-    requestAnimationFrame(() => scrollRef.current?.scrollBy({ top: 1000, behavior: "smooth" }));
     void Promise.resolve().then(async () => {
+      if (!model) return;
+      // append the user message
+      setBlocks((blocks) => [
+        ...blocks,
+        { id: Date.now().toString(), type: "text", role: "user", content },
+      ]);
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ top: 1_000_000, behavior: "smooth" });
+      });
+      // stream the completion
       try {
         await streamCompletion(
           BASE_URL,
           API_KEY,
           chatId,
-          _model.modelId,
-          _model.personalityId,
+          model.modelId,
+          model.personalityId,
           false,
           content,
-          (message) => {
-            if (message.method === "block" && message.params.type === "text") {
+          (msg) => {
+            if (msg.method === "block") {
               setBlocks((blocks) => {
-                const exists = blocks.find((i) => i.id === message.params.id);
-                if (exists) {
-                  return blocks.map((i) => (i.id === message.params.id ? message.params : i));
-                }
-                return [...blocks, message.params];
+                const idx = blocks.findIndex((i) => i.id === msg.params.id);
+                if (idx === -1) return [...blocks, msg.params];
+                blocks[idx] = msg.params;
+                return [...blocks];
               });
             }
           }

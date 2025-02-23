@@ -103,6 +103,16 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 			})
 			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(msg)))
 			flusher.Flush()
+			for _, i := range i.toolCalls {
+				msg := jsonrpc.NewNotification("block", map[string]any{
+					"id":   i.ID,
+					"type": "tool_call",
+					"name": i.FuncName,
+					"args": i.FuncArgs,
+				})
+				fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(msg)))
+				flusher.Flush()
+			}
 			continue
 		case *ToolMessageChatEvent:
 			if err := app.upsertChatEvent(ctx, chatID, i); err != nil {
