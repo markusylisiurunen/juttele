@@ -37,19 +37,13 @@ async function streamCompletion(
         if (line.startsWith("data: ")) {
           const data = line.slice(6);
           const parsed = JSON.parse(data) as {
-            error?: string;
-            thinking?: string;
-            content?: string;
-            tool_call?: { name: string; args: string };
+            kind: string;
+            data: {
+              content: string;
+            };
           };
-          if (parsed.error) {
-            onError(parsed.error);
-          } else if (parsed.thinking) {
-            onThinking(parsed.thinking);
-          } else if (parsed.content) {
-            onContent(parsed.content);
-          } else if (parsed.tool_call) {
-            onToolCall(parsed.tool_call.name, parsed.tool_call.args);
+          if (parsed.kind === "message.assistant") {
+            onContent(parsed.data.content);
           }
         }
       }

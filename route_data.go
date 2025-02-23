@@ -11,9 +11,18 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+type dataResponseHistoryItemToolCallFunction struct {
+	Name string `json:"name"`
+	Args string `json:"arguments"`
+}
+type dataResponseHistoryItemToolCall struct {
+	ID       string                                  `json:"id"`
+	Function dataResponseHistoryItemToolCallFunction `json:"function"`
+}
 type dataResponseHistoryItemMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string                            `json:"role"`
+	Content   string                            `json:"content"`
+	ToolCalls []dataResponseHistoryItemToolCall `json:"tool_calls,omitempty"`
 }
 type dataResponseHistoryItemReasoning struct {
 	Content string `json:"content"`
@@ -54,12 +63,25 @@ func (app *App) dataRouteHandler(w http.ResponseWriter, r *http.Request) {
 		vi.History = make([]dataResponseHistoryItem, 0, len(events.Items))
 		for _, i := range events.Items {
 			if strings.HasPrefix(i.Kind, "message.") {
+				itemData := dataResponseHistoryItemMessage{
+					Role:    strings.TrimPrefix(i.Kind, "message."),
+					Content: gjson.GetBytes(i.Content, "content").String(),
+				}
+				if gjson.GetBytes(i.Content, "tool_calls").Exists() {
+					itemData.ToolCalls = make([]dataResponseHistoryItemToolCall, 0)
+					for _, tc := range gjson.GetBytes(i.Content, "tool_calls").Array() {
+						itemData.ToolCalls = append(itemData.ToolCalls, dataResponseHistoryItemToolCall{
+							ID: tc.Get("id").String(),
+							Function: dataResponseHistoryItemToolCallFunction{
+								Name: tc.Get("function.name").String(),
+								Args: tc.Get("function.arguments").String(),
+							},
+						})
+					}
+				}
 				vi.History = append(vi.History, dataResponseHistoryItem{
 					Kind: "message",
-					Data: dataResponseHistoryItemMessage{
-						Role:    strings.TrimPrefix(i.Kind, "message."),
-						Content: gjson.GetBytes(i.Content, "content").String(),
-					},
+					Data: itemData,
 				})
 			}
 			if i.Kind == "other.reasoning" {

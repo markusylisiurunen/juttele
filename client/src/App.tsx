@@ -39,8 +39,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           const MAX_BLUR = 24;
           const blur = MIN_BLUR + (MAX_BLUR - MIN_BLUR) * (1 - i / (BLUR_SEGMENTS - 1));
           let gradCenter = (i / (BLUR_SEGMENTS - 1)) * 100;
-          gradCenter *= 1 - 0.16;
-          const d = 8;
+          gradCenter *= 1 - 0.33;
+          const d = 20;
           const grad1 = Math.max(0, gradCenter - 2 * d);
           const grad2 = Math.max(0, gradCenter - 1 * d);
           const grad3 = Math.min(100, gradCenter + 1 * d);
@@ -121,6 +121,16 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
           role: "assistant",
           content: item.data.content,
         });
+        if (item.data.tool_calls && item.data.tool_calls.length > 0) {
+          for (const t of item.data.tool_calls) {
+            blocks.push({
+              id: Date.now().toString() + "_" + blocks.length,
+              type: "tool_call",
+              name: t.function.name,
+              args: t.function.arguments,
+            });
+          }
+        }
       }
     }
     setBlocks(blocks);
@@ -155,7 +165,7 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
               });
             });
           },
-          (contentDelta) => {
+          (content) => {
             setBlocks((blocks) => {
               const last = blocks.at(-1);
               if (last?.type !== "text") {
@@ -164,7 +174,7 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
               }
               return blocks.map((i) => {
                 if (i.id === botId && i.type === "text") {
-                  return { ...i, content: i.content + contentDelta };
+                  return { ...i, content: content };
                 }
                 return i;
               });

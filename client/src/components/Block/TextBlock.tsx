@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from "react";
+import { CheckIcon, CopyIcon, RotateCwIcon } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import Markdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
-import { codeToHtml } from "shiki";
 import { TextBlock } from "../../blocks";
+import { Pre, Table } from "../Markdown/Markdown";
 import styles from "./TextBlock.module.css";
 
 const preprocessLaTeX = (content: string) => {
@@ -17,53 +18,38 @@ type TextComponentProps = {
   block: TextBlock;
 };
 const TextComponent: React.FC<TextComponentProps> = ({ block }) => {
-  const ref = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!ref.current) return;
-      const pres = ref.current.querySelectorAll("& > pre");
-      for (const pre of Array.from(pres)) {
-        if (pre.classList.contains("shiki")) continue;
-        const code = pre.querySelector("& > code");
-        if (!code) continue;
-        const lang =
-          code
-            .getAttribute("class")
-            ?.split(" ")
-            .find((i) => i.startsWith("language-"))
-            ?.slice(9) ?? "plaintext";
-        codeToHtml(code.textContent || "", {
-          lang: lang,
-          theme: "github-dark-dimmed",
-        }).then((html) => {
-          const div = document.createElement("div");
-          div.innerHTML = html;
-          pre.replaceWith(div.firstChild!);
-        });
-      }
-    }, 500);
+    if (!copied) return;
+    const timeout = setTimeout(() => setCopied(false), 500);
     return () => clearTimeout(timeout);
-  }, [block.content]);
+  }, [copied]);
   return (
     <div className={styles.root} data-block="text" data-role={block.role}>
-      <div
-        ref={ref}
-        className={styles.content}
-        style={{ opacity: block.role === "user" ? 0.5 : undefined }}
-      >
+      <div className={styles.content} style={{ opacity: block.role === "user" ? 0.5 : undefined }}>
         <Markdown
           remarkPlugins={[remarkGfm, remarkMath]}
           rehypePlugins={[rehypeKatex]}
-          components={{
-            table: ({ children }) => (
-              <div>
-                <table>{children}</table>
-              </div>
-            ),
-          }}
+          components={{ pre: Pre, table: Table }}
         >
           {preprocessLaTeX(block.content)}
         </Markdown>
+      </div>
+      <div className={styles.actions}>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(block.content.trim() + "\n");
+            setCopied(true);
+          }}
+        >
+          {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+        </button>
+        <button>
+          <RotateCwIcon size={13} />
+        </button>
+        <span>
+          {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}
+        </span>
       </div>
     </div>
   );

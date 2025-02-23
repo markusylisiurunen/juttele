@@ -44,21 +44,25 @@ button {
   transform: translateX(-50%);
   width: 100vw;
   z-index: 999;
+}
+.app-header .blur {
+  bottom: auto;
+  height: 110%;
+  left: 0px;
+  position: absolute;
+  right: var(--spacing-padding-x);
+  top: 0px;
+  z-index: 1;
 
   --gradient-1: color-mix(in srgb, var(--color-bg) 100%, transparent);
   --gradient-2: color-mix(in srgb, var(--color-bg) 67%, transparent);
   --gradient-3: color-mix(in srgb, var(--color-bg) 0%, transparent);
   background: linear-gradient(
     to bottom,
-    var(--gradient-1) 25%,
-    var(--gradient-2) 80%,
-    var(--gradient-3) 100%
+    var(--gradient-1) 10%,
+    var(--gradient-2) 50%,
+    var(--gradient-3) 97%
   );
-}
-.app-header .blur {
-  inset: 0px;
-  position: absolute;
-  z-index: 1;
 }
 .app-header .blur > div {
   inset: 0px;

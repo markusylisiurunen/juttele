@@ -1,6 +1,44 @@
 .root {
   padding-inline: var(--spacing-padding-x);
 }
+.actions {
+  --color-accent: hsl(284, 0%, 20%);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-accent) 20%, transparent),
+    color-mix(in srgb, var(--color-accent) 6%, transparent)
+  );
+
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+  display: inline-flex;
+  margin-block-start: 8px;
+  margin-inline-start: -4px;
+  padding-block: 1px;
+  padding-inline: 4px 6px;
+}
+.actions button {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+  padding: 4px 3px;
+  transition: color 90ms linear;
+}
+.actions button:hover {
+  color: var(--color-text);
+}
+.actions span {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+  display: block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  letter-spacing: -0.05em;
+  line-height: 1.2;
+  margin-inline-start: 3px;
+  transition: color 90ms linear;
+}
+.actions:hover span {
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
 /* spacing within messages */
 .content {
   --gap-sm: 0.5em;
@@ -21,7 +59,7 @@
 .content p,
 .content ul,
 .content ol,
-.content pre {
+.content div:has(> pre) {
   margin-block: 0px;
 }
 .content h1,
@@ -65,8 +103,11 @@
   margin-block-end: 0px;
   margin-block-start: calc(var(--gap-sm) / 3);
 }
-.content pre {
+.content div:has(> pre) {
   margin-block: var(--gap-md);
+}
+.content div > pre {
+  margin-block: 0px;
 }
 .content hr {
   margin-block: var(--gap-md);
@@ -172,12 +213,34 @@
   font-size: 14px;
   letter-spacing: -0.05em;
   padding-block: 0.5px;
-  padding-inline: 3px;
+  padding-inline: 4px;
 }
 /* code blocks */
+.content div:has(> pre) > div:first-child {
+  align-items: center;
+  display: flex;
+  padding-block-end: 2px;
+}
+.content div:has(> pre) > div:first-child span {
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  letter-spacing: initial;
+  line-height: 1.2;
+}
+.content div:has(> pre) > div:first-child button {
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  margin-inline-start: -4px;
+  margin-inline-end: 2px;
+  padding: 4px;
+  transition: color 90ms linear;
+}
+.content div:has(> pre) > div:first-child button:hover {
+  color: var(--color-text);
+}
 .content pre {
   appearance: none;
-  background: color-mix(in srgb, var(--color-text) 3%, transparent) !important;
+  background: color-mix(in srgb, var(--color-text) 4%, transparent) !important;
   font-size: 13px;
   margin-inline: calc(-1 * var(--spacing-padding-x));
   overflow-x: auto;

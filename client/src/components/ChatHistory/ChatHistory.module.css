@@ -6,7 +6,7 @@
 }
 .history {
   overflow-y: auto;
-  padding-block-end: 96px;
+  padding-block-end: 64px;
   padding-block-start: calc(64px + 8px);
 }
 .history {
@@ -41,7 +41,7 @@
   margin-block-end: var(--gap-md);
 }
 .history [data-block="text"][data-role="user"] {
-  padding-block: 8px;
+  padding-block: 8px 12px;
 }
 .history [data-block="text"][data-role="user"]:first-child {
   padding-block-start: 0px;

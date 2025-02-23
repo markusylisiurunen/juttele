@@ -11,9 +11,10 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ scrollRef, blocks }) => {
   return (
     <div className={styles.root}>
       <div className={styles.history} ref={scrollRef}>
-        {blocks.map((i, idx) => {
+        {blocks.flatMap((i, idx) => {
           switch (i.type) {
             case "text":
+              if (i.content.trim() === "") return [];
               return <Block.Text key={i.id} block={i} />;
             case "thinking":
               return <Block.Thinking key={i.id} active={idx === blocks.length - 1} block={i} />;

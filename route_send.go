@@ -1,6 +1,7 @@
 package juttele
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/markusylisiurunen/juttele/internal/repo"
 	"github.com/markusylisiurunen/juttele/internal/util"
 )
@@ -71,6 +71,10 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		history = append(history, event)
 	}
 	history = append(history, NewUserMessageChatEvent(v.Content))
+	if err := app.upsertChatEvent(ctx, chatID, NewUserMessageChatEvent(v.Content)); err != nil {
+		http.Error(w, fmt.Sprintf("error upserting chat event: %v", err), http.StatusInternalServerError)
+		return
+	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
@@ -79,10 +83,6 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.WriteHeader(http.StatusOK)
-	var (
-		reasoning  strings.Builder
-		completion strings.Builder
-	)
 	out := model.StreamCompletion(r.Context(), *systemPrompt, history)
 	for i := range out {
 		if i == nil {
@@ -90,43 +90,36 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		switch i := i.(type) {
 		case *AssistantMessageChatEvent:
-			data := map[string]string{"content": i.content[completion.Len():]}
-			completion.Reset()
-			completion.WriteString(i.content)
-			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(data)))
+			if err := app.upsertChatEvent(ctx, chatID, i); err != nil {
+				http.Error(w, fmt.Sprintf("error upserting chat event: %v", err), http.StatusInternalServerError)
+				return
+			}
+			_, kind, data := i.getChatEvent()
+			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(map[string]any{"kind": kind, "data": json.RawMessage(data)})))
+			flusher.Flush()
+			continue
+		case *ToolMessageChatEvent:
+			if err := app.upsertChatEvent(ctx, chatID, i); err != nil {
+				http.Error(w, fmt.Sprintf("error upserting chat event: %v", err), http.StatusInternalServerError)
+				return
+			}
+			_, kind, data := i.getChatEvent()
+			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(map[string]any{"kind": kind, "data": json.RawMessage(data)})))
 			flusher.Flush()
 			continue
 		}
 	}
+}
+
+func (app *App) upsertChatEvent(ctx context.Context, id int64, event ChatEvent) error {
+	uuid, kind, content := event.getChatEvent()
 	if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-		ChatID:  chatID,
-		UUID:    uuid.Must(uuid.NewV7()).String(),
-		Kind:    "message.user",
-		Content: util.Must(json.Marshal(map[string]any{"content": v.Content})),
+		ChatID:  id,
+		UUID:    uuid,
+		Kind:    kind,
+		Content: content,
 	}); err != nil {
-		fmt.Printf("error creating chat event: %v\n", err)
-		return
+		return err
 	}
-	if reasoning.Len() > 0 {
-		if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-			ChatID:  chatID,
-			UUID:    uuid.Must(uuid.NewV7()).String(),
-			Kind:    "other.reasoning",
-			Content: util.Must(json.Marshal(map[string]any{"content": reasoning.String()})),
-		}); err != nil {
-			fmt.Printf("error creating chat event: %v\n", err)
-			return
-		}
-	}
-	if completion.Len() > 0 {
-		if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-			ChatID:  chatID,
-			UUID:    uuid.Must(uuid.NewV7()).String(),
-			Kind:    "message.assistant",
-			Content: util.Must(json.Marshal(map[string]any{"content": completion.String()})),
-		}); err != nil {
-			fmt.Printf("error creating chat event: %v\n", err)
-			return
-		}
-	}
+	return nil
 }

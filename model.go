@@ -61,6 +61,7 @@ func callOpenAICompatibleAPI(
 			if line == "[DONE]" {
 				continue
 			}
+			// fmt.Printf("line: %s\n", line)
 			vs <- []byte(line)
 		}
 	})
