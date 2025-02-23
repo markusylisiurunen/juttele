@@ -28,6 +28,7 @@ func parseChatEvent(ts time.Time, uuid string, kind string, content []byte) (Cha
 		var v AssistantMessageChatEvent
 		v.ts = ts
 		v.uuid = uuid
+		v.reasoning = gjson.GetBytes(content, "reasoning").String()
 		v.content = gjson.GetBytes(content, "content").String()
 		if gjson.GetBytes(content, "tool_calls").Exists() {
 			toolCalls := gjson.GetBytes(content, "tool_calls").Array()
@@ -72,6 +73,7 @@ type assistantMessageToolCall struct {
 type AssistantMessageChatEvent struct {
 	ts        time.Time
 	uuid      string
+	reasoning string
 	content   string
 	toolCalls []assistantMessageToolCall
 }
@@ -80,6 +82,7 @@ func NewAssistantMessageChatEvent(content string) *AssistantMessageChatEvent {
 	return &AssistantMessageChatEvent{
 		time.Now(),
 		uuid.Must(uuid.NewV7()).String(),
+		"",
 		content,
 		nil,
 	}
@@ -97,12 +100,14 @@ func (e *AssistantMessageChatEvent) getChatEvent() (string, string, []byte) {
 	}
 	type content struct {
 		Role      string     `json:"role"`
+		Reasoning string     `json:"reasoning,omitzero"`
 		Content   string     `json:"content"`
 		ToolCalls []toolCall `json:"tool_calls,omitempty"`
 	}
 	c := content{
-		Role:    "assistant",
-		Content: e.content,
+		Role:      "assistant",
+		Reasoning: e.reasoning,
+		Content:   e.content,
 	}
 	if len(e.toolCalls) > 0 {
 		toolCalls := make([]toolCall, len(e.toolCalls))

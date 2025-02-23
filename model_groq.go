@@ -173,7 +173,8 @@ func (m *groqModel) StreamCompletion(ctx context.Context, systemPrompt string, h
 				return
 			}
 			if b.Choices[0].Delta.Reasoning != nil {
-				fmt.Printf("reasoning: %v\n", *b.Choices[0].Delta.Reasoning)
+				resp.reasoning += *b.Choices[0].Delta.Reasoning
+				out <- resp
 			}
 			if b.Choices[0].Delta.Content != nil {
 				resp.content += *b.Choices[0].Delta.Content

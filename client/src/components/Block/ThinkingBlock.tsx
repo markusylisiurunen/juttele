@@ -1,5 +1,5 @@
-import { BrainIcon } from "lucide-react";
-import React, { useMemo } from "react";
+import { BrainIcon, CheckIcon, CopyIcon } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ThinkingBlock } from "../../blocks";
 import styles from "./Thinking.module.css";
 
@@ -7,9 +7,19 @@ type ThinkingComponentProps = {
   active: boolean;
   block: ThinkingBlock;
 };
-const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ active }) => {
+const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ active, block }) => {
   const beginAt = useMemo(() => Date.now(), []);
   const thoughtForSeconds = `${Math.round((Date.now() - beginAt) / 1000)} s`;
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = setTimeout(() => setCopied(false), 500);
+    return () => clearTimeout(timeout);
+  }, [copied]);
+  function onCopy() {
+    navigator.clipboard.writeText(block.content);
+    setCopied(true);
+  }
   return (
     <div className={styles.root} data-block="thinking" data-active={active ? "" : undefined}>
       <div className={styles.block}>
@@ -18,6 +28,9 @@ const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ active }) => {
           {active ? `Thinking for ${thoughtForSeconds}...` : `Thought for ${thoughtForSeconds}`}
         </span>
       </div>
+      <button className={styles.copy} disabled={copied} onClick={onCopy}>
+        {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
+      </button>
     </div>
   );
 };

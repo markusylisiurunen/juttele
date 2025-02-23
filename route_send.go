@@ -95,14 +95,25 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, fmt.Sprintf("error upserting chat event: %v", err), http.StatusInternalServerError)
 				return
 			}
-			msg := jsonrpc.NewNotification("block", map[string]any{
-				"id":      i.uuid,
-				"type":    "text",
-				"role":    "assistant",
-				"content": i.content,
-			})
-			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(msg)))
-			flusher.Flush()
+			if len(i.reasoning) > 0 {
+				msg := jsonrpc.NewNotification("block", map[string]any{
+					"id":      i.uuid + "_thinking",
+					"type":    "thinking",
+					"content": i.reasoning,
+				})
+				fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(msg)))
+				flusher.Flush()
+			}
+			if len(i.content) > 0 {
+				msg := jsonrpc.NewNotification("block", map[string]any{
+					"id":      i.uuid,
+					"type":    "text",
+					"role":    "assistant",
+					"content": i.content,
+				})
+				fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(msg)))
+				flusher.Flush()
+			}
 			for _, i := range i.toolCalls {
 				msg := jsonrpc.NewNotification("block", map[string]any{
 					"id":   i.ID,
