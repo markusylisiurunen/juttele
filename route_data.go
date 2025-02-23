@@ -63,6 +63,15 @@ func (app *App) dataRouteHandler(w http.ResponseWriter, r *http.Request) {
 		vi.History = make([]dataResponseHistoryItem, 0, len(events.Items))
 		for _, i := range events.Items {
 			if strings.HasPrefix(i.Kind, "message.") {
+				reasoning := gjson.GetBytes(i.Content, "reasoning")
+				if reasoning.Exists() {
+					vi.History = append(vi.History, dataResponseHistoryItem{
+						Kind: "reasoning",
+						Data: dataResponseHistoryItemReasoning{
+							Content: reasoning.String(),
+						},
+					})
+				}
 				itemData := dataResponseHistoryItemMessage{
 					Role:    strings.TrimPrefix(i.Kind, "message."),
 					Content: gjson.GetBytes(i.Content, "content").String(),
@@ -82,14 +91,6 @@ func (app *App) dataRouteHandler(w http.ResponseWriter, r *http.Request) {
 				vi.History = append(vi.History, dataResponseHistoryItem{
 					Kind: "message",
 					Data: itemData,
-				})
-			}
-			if i.Kind == "other.reasoning" {
-				vi.History = append(vi.History, dataResponseHistoryItem{
-					Kind: "reasoning",
-					Data: dataResponseHistoryItemReasoning{
-						Content: gjson.GetBytes(i.Content, "content").String(),
-					},
 				})
 			}
 		}

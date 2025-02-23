@@ -139,6 +139,13 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
           }
         }
       }
+      if (item.kind === "reasoning") {
+        blocks.push({
+          id: Date.now().toString() + "_" + blocks.length,
+          type: "thinking",
+          content: item.data.content,
+        });
+      }
     }
     setBlocks(blocks);
   }, [chatId]);
