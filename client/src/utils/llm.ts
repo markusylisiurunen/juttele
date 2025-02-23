@@ -5,10 +5,10 @@ async function streamCompletion(
   modelId: string,
   personalityId: string,
   content: string,
-  onThinking: (delta: string) => void,
+  _onThinking: (delta: string) => void,
   onContent: (delta: string) => void,
-  onToolCall: (tool: string, args: string) => void,
-  onError: (error: string) => void
+  _onToolCall: (tool: string, args: string) => void,
+  _onError: (error: string) => void
 ): Promise<void> {
   const resp = await fetch(`${baseUrl}/chats/${chatId}`, {
     method: "POST",
