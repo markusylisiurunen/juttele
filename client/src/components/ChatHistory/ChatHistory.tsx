@@ -47,15 +47,18 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ scrollRef, blocks }) => {
           switch (i.type) {
             case "text":
               if (i.content.trim() === "") return [];
-              return [<Divider prev={prev} next={i} />, <Block.Text key={i.id} block={i} />];
+              return [
+                <Divider key={i.id + "_divider"} prev={prev} next={i} />,
+                <Block.Text key={i.id} block={i} />,
+              ];
             case "thinking":
               return [
-                <Divider prev={prev} next={i} />,
+                <Divider key={i.id + "_divider"} prev={prev} next={i} />,
                 <Block.Thinking key={i.id} active={idx === blocks.length - 1} block={i} />,
               ];
             case "tool_call":
               return [
-                <Divider prev={prev} next={i} />,
+                <Divider key={i.id + "_divider"} prev={prev} next={i} />,
                 <Block.ToolCall key={i.id} active={idx === blocks.length - 1} block={i} />,
               ];
             default:

@@ -1,0 +1,7 @@
+<system_time>
+{{current_time}}
+</system_time>
+
+<instructions>
+- Do not use emojis
+</instructions>

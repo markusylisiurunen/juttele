@@ -146,9 +146,7 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
     const _model = model;
     if (!_model) return;
     const userId = Date.now().toString();
-    let botId = userId + "_assistant";
     setBlocks((h) => [...h, { id: userId, type: "text", role: "user", content }]);
-    setBlocks((h) => [...h, { id: botId, type: "text", role: "assistant", content: "" }]);
     requestAnimationFrame(() => scrollRef.current?.scrollBy({ top: 1000, behavior: "smooth" }));
     void Promise.resolve().then(async () => {
       try {
@@ -158,65 +156,22 @@ const App: React.FC<AppProps> = ({ configAtom, dataAtom, chatId, onGoToChats, on
           chatId,
           _model.modelId,
           _model.personalityId,
+          false,
           content,
-          (thinkingDelta) => {
-            setBlocks((blocks) => {
-              const last = blocks.at(-1);
-              if (last?.type !== "thinking") {
-                const id = Date.now().toString() + "_thinking";
-                blocks = [...blocks, { id: id, type: "thinking", content: "" }];
-              }
-              return blocks.map((i, idx) => {
-                if (idx !== blocks.length - 1 || i.type !== "thinking") return i;
-                return { ...i, content: i.content + thinkingDelta };
-              });
-            });
-          },
-          (content) => {
-            setBlocks((blocks) => {
-              const last = blocks.at(-1);
-              if (last?.type !== "text") {
-                botId = Date.now().toString() + "_assistant";
-                blocks = [...blocks, { id: botId, type: "text", role: "assistant", content: "" }];
-              }
-              return blocks.map((i) => {
-                if (i.id === botId && i.type === "text") {
-                  return { ...i, content: content };
+          (message) => {
+            if (message.method === "block" && message.params.type === "text") {
+              setBlocks((blocks) => {
+                const exists = blocks.find((i) => i.id === message.params.id);
+                if (exists) {
+                  return blocks.map((i) => (i.id === message.params.id ? message.params : i));
                 }
-                return i;
+                return [...blocks, message.params];
               });
-            });
-          },
-          (tool, args) => {
-            setBlocks((blocks) => {
-              const last = blocks.at(-1);
-              if (last?.type === "tool_call") {
-                return [...blocks.slice(0, -1), { ...last, name: tool, args: args }];
-              }
-              const id = Date.now().toString() + "_tool";
-              return [...blocks, { id: id, type: "tool_call", name: tool, args: args }];
-            });
-          },
-          (error) => {
-            setBlocks((history) =>
-              history.map((i) => {
-                if (i.id === botId && i.type === "text") {
-                  return { ...i, content: `Error: ${error}` };
-                }
-                return i;
-              })
-            );
+            }
           }
         );
       } catch (error) {
-        setBlocks((history) =>
-          history.map((i) => {
-            if (i.id === botId && i.type === "text") {
-              return { ...i, content: `Error: ${error}` };
-            }
-            return i;
-          })
-        );
+        console.error(error);
       }
     });
   }
@@ -316,22 +271,38 @@ const AppWrapper: React.FC = () => {
     void init();
     return null;
   }
+  const devModeIndicator = BASE_URL.includes("localhost") ? (
+    <div
+      style={{
+        background: "yellow",
+        height: "2px",
+        left: "0px",
+        position: "fixed",
+        right: "0px",
+        top: "0px",
+        zIndex: 99999,
+      }}
+    />
+  ) : null;
   switch (route) {
     case "app":
       return (
-        <App
-          api={api}
-          configAtom={configAtom}
-          dataAtom={dataAtom}
-          chatId={chatId}
-          onGoToChats={() => navigateTo("chatList")}
-          onReset={() => {
-            setConfigAtom(undefined);
-            setDataAtom(undefined);
-            setChatId(undefined);
-            setRoute("app");
-          }}
-        />
+        <>
+          <App
+            api={api}
+            configAtom={configAtom}
+            dataAtom={dataAtom}
+            chatId={chatId}
+            onGoToChats={() => navigateTo("chatList")}
+            onReset={() => {
+              setConfigAtom(undefined);
+              setDataAtom(undefined);
+              setChatId(undefined);
+              setRoute("app");
+            }}
+          />
+          {devModeIndicator}
+        </>
       );
     case "chatList":
       return (

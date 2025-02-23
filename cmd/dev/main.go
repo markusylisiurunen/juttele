@@ -18,8 +18,8 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-//go:embed prompts/neutral.txt
-var neutralSystemPrompt string
+//go:embed prompts/raw.txt
+var rawSystemPrompt string
 
 type Note struct {
 	UUID      string `json:"uuid"`
@@ -146,29 +146,25 @@ func main() {
 	var (
 		gpt4o = juttele.NewOpenRouterModel(openRouterToken, "openai/gpt-4o-2024-11-20",
 			juttele.WithOpenRouterModelDisplayName("GPT-4o"),
-			juttele.WithOpenRouterModelPersonality("Neutral", neutralSystemPrompt),
+			juttele.WithOpenRouterModelPersonality("Raw", rawSystemPrompt),
 			juttele.WithOpenRouterModelTool("list_notes", listNotesToolSpec, listNotesToolHandler),
 			juttele.WithOpenRouterModelTool("write_note", writeNoteToolSpec, writeOrUpdateNoteToolHandler),
 			juttele.WithOpenRouterModelTool("update_note", updateNoteToolSpec, writeOrUpdateNoteToolHandler),
 		)
 		claude35Sonnet = juttele.NewOpenRouterModel(openRouterToken, "anthropic/claude-3.5-sonnet:beta",
 			juttele.WithOpenRouterModelDisplayName("Claude 3.5 Sonnet"),
-			juttele.WithOpenRouterModelPersonality("Neutral", neutralSystemPrompt),
+			juttele.WithOpenRouterModelPersonality("Raw", rawSystemPrompt),
 			juttele.WithOpenRouterModelTool("list_notes", listNotesToolSpec, listNotesToolHandler),
 			juttele.WithOpenRouterModelTool("write_note", writeNoteToolSpec, writeOrUpdateNoteToolHandler),
 			juttele.WithOpenRouterModelTool("update_note", updateNoteToolSpec, writeOrUpdateNoteToolHandler),
 		)
 		deepseekR1Llama70b = juttele.NewGroqModel(groqToken, "deepseek-r1-distill-llama-70b",
 			juttele.WithGroqModelDisplayName("DeepSeek R1 (Llama 70B)"),
-			juttele.WithGroqModelPersonality("Neutral", neutralSystemPrompt),
+			juttele.WithGroqModelPersonality("Raw", rawSystemPrompt),
 		)
 		gemini20FlashThinking = juttele.NewGoogleModel(googleToken, "gemini-2.0-flash-thinking-exp-01-21",
 			juttele.WithGoogleModelDisplayName("Gemini 2.0 Flash Thinking"),
-			juttele.WithGoogleModelPersonality("Neutral", neutralSystemPrompt),
-		)
-		mistralLarge = juttele.NewOpenRouterModel(openRouterToken, "mistralai/mistral-large-2411",
-			juttele.WithOpenRouterModelDisplayName("Mistral Large"),
-			juttele.WithOpenRouterModelPersonality("Neutral", neutralSystemPrompt),
+			juttele.WithGoogleModelPersonality("Raw", rawSystemPrompt),
 		)
 	)
 	app := juttele.New("YOUR_TOKEN_HERE",
@@ -176,7 +172,6 @@ func main() {
 		juttele.WithModel(claude35Sonnet),
 		juttele.WithModel(deepseekR1Llama70b),
 		juttele.WithModel(gemini20FlashThinking),
-		juttele.WithModel(mistralLarge),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -11,6 +11,7 @@ import (
 
 	"github.com/markusylisiurunen/juttele/internal/repo"
 	"github.com/markusylisiurunen/juttele/internal/util"
+	"github.com/markusylisiurunen/juttele/internal/util/jsonrpc"
 )
 
 type sendRequest struct {
@@ -94,8 +95,13 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, fmt.Sprintf("error upserting chat event: %v", err), http.StatusInternalServerError)
 				return
 			}
-			_, kind, data := i.getChatEvent()
-			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(map[string]any{"kind": kind, "data": json.RawMessage(data)})))
+			msg := jsonrpc.NewNotification("block", map[string]any{
+				"id":      i.uuid,
+				"type":    "text",
+				"role":    "assistant",
+				"content": i.content,
+			})
+			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(msg)))
 			flusher.Flush()
 			continue
 		case *ToolMessageChatEvent:
@@ -103,10 +109,6 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, fmt.Sprintf("error upserting chat event: %v", err), http.StatusInternalServerError)
 				return
 			}
-			_, kind, data := i.getChatEvent()
-			fmt.Fprintf(w, "data: %s\n\n", util.Must(json.Marshal(map[string]any{"kind": kind, "data": json.RawMessage(data)})))
-			flusher.Flush()
-			continue
 		}
 	}
 }
