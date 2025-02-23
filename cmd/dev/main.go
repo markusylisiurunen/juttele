@@ -166,12 +166,17 @@ func main() {
 			juttele.WithGoogleModelDisplayName("Gemini 2.0 Flash Thinking"),
 			juttele.WithGoogleModelPersonality("Neutral", neutralSystemPrompt),
 		)
+		mistralLarge = juttele.NewOpenRouterModel(openRouterToken, "mistralai/mistral-large-2411",
+			juttele.WithOpenRouterModelDisplayName("Mistral Large"),
+			juttele.WithOpenRouterModelPersonality("Neutral", neutralSystemPrompt),
+		)
 	)
 	app := juttele.New("YOUR_TOKEN_HERE",
 		juttele.WithModel(gpt4o),
 		juttele.WithModel(claude35Sonnet),
 		juttele.WithModel(deepseekR1Llama70b),
 		juttele.WithModel(gemini20FlashThinking),
+		juttele.WithModel(mistralLarge),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
