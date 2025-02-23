@@ -62,6 +62,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             />
           );
         })}
+        {/* make sure the blur doesn't bleed from the top */}
+        <div
+          style={{
+            background: "linear-gradient(to bottom, var(--color-bg) 0%, transparent 20%)",
+            zIndex: 99,
+          }}
+        />
       </div>
       <div>
         <button onClick={onChatsClick}>

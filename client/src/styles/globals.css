@@ -74,6 +74,8 @@ button {
   gap: 8px;
   position: relative;
   z-index: 2;
+  /* shifts the content a bit to the top */
+  padding-block-end: 8px;
 }
 .app-header button {
   --color-accent: hsl(284, 0%, 25%);
