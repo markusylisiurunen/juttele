@@ -1,60 +1,120 @@
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-};
+import { z } from "zod";
+import { AnyBlock } from "../blocks";
+import { Tool } from "../tools";
+
+const toolCallMessage = z.object({
+  jsonrpc: z.literal("2.0"),
+  id: z.number(),
+  method: z.literal("tool_call"),
+  params: z.object({
+    name: z.string(),
+    args: z.string(),
+  }),
+});
+const blockNotification = z.object({
+  jsonrpc: z.literal("2.0"),
+  method: z.literal("block"),
+  params: AnyBlock,
+});
+const StreamMessage = z.union([toolCallMessage, blockNotification]);
+type StreamMessage = z.infer<typeof StreamMessage>;
 
 async function streamCompletion(
+  baseUrl: string,
+  apiKey: string,
+  chatId: number,
   modelId: string,
   personalityId: string,
-  history: Message[],
-  onThinking: (delta: string) => void,
-  onContent: (delta: string) => void,
-  onError: (error: string) => void
+  useTools: boolean,
+  content: string,
+  tools: Tool[],
+  onMessage: (message: StreamMessage) => void
 ): Promise<void> {
-  const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL}/stream`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${import.meta.env.VITE_API_KEY}` },
-    body: JSON.stringify({
-      model_id: modelId,
-      model_personality_id: personalityId,
-      history: history,
-    }),
-  });
-  if (!resp.ok) {
-    throw new Error(`unexpected status: ${resp.status}`);
-  }
-  if (!resp.body) {
-    throw new Error("missing response body");
-  }
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  try {
-    while (true) {
-      const { value, done }: ReadableStreamReadResult<Uint8Array> = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value);
-      const lines = chunk.split("\n").filter((line) => line.trim() !== "");
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          const parsed = JSON.parse(data) as {
-            error?: string;
-            thinking?: string;
-            content?: string;
-          };
-          if (parsed.error) {
-            onError(parsed.error);
-          } else if (parsed.thinking) {
-            onThinking(parsed.thinking);
-          } else if (parsed.content) {
-            onContent(parsed.content);
-          }
+  const wsBaseUrl = baseUrl.replace(/^http/, "ws");
+  const wsUrl = `${wsBaseUrl}/chats/${chatId}?api_key=${encodeURIComponent(apiKey)}`;
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(wsUrl);
+    socket.onopen = () => {
+      socket.send(
+        JSON.stringify({
+          model_id: modelId,
+          personality_id: personalityId,
+          content: content,
+          tools: tools.map((tool) => ({ name: tool.Name, spec: tool.Spec })),
+          use_tools: useTools,
+        })
+      );
+    };
+    socket.onmessage = (event) => {
+      try {
+        const parsed = StreamMessage.safeParse(JSON.parse(event.data));
+        if (!parsed.success) {
+          console.error(`received an unexpected message: ${event.data}`);
+          return;
         }
+        const data = parsed.data;
+        if (data.method === "tool_call") {
+          const tool = tools.find((tool) => tool.Name === data.params.name);
+          if (tool) {
+            void Promise.resolve().then(async () => {
+              try {
+                const result = await tool.Call(data.params.args);
+                socket.send(
+                  JSON.stringify({
+                    jsonrpc: "2.0",
+                    result: result,
+                    id: data.id,
+                  })
+                );
+              } catch (error) {
+                console.error(`error calling tool "${tool.Name}":`, error);
+                socket.send(
+                  JSON.stringify({
+                    jsonrpc: "2.0",
+                    error: {
+                      code: 0,
+                      message: error instanceof Error ? error.message : "Something went wrong.",
+                    },
+                    id: data.id,
+                  })
+                );
+              }
+            });
+          } else {
+            socket.send(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                error: {
+                  code: 0,
+                  message: `Tool "${data.params.name}" not found.`,
+                },
+                id: data.id,
+              })
+            );
+          }
+          return;
+        }
+        onMessage(parsed.data);
+      } catch (error) {
+        console.error("error parsing websocket message:", error);
       }
-    }
-  } finally {
-    reader.releaseLock();
-  }
+    };
+    let socketErrorOccurred = false;
+    socket.onerror = (error) => {
+      socketErrorOccurred = true;
+      console.error("WebSocket error:", error);
+      reject(new Error(`WebSocket error`));
+    };
+    socket.onclose = (event) => {
+      if (event.code === 1000 || event.code === 1001 || event.code === 1005) {
+        resolve();
+      } else if (event.code === 1006 && !socketErrorOccurred) {
+        resolve();
+      } else {
+        reject(new Error(`WebSocket closed with code: ${event.code}, reason: ${event.reason}`));
+      }
+    };
+  });
 }
 
-export { streamCompletion };
+export { streamCompletion, StreamMessage };

@@ -1,127 +1,75 @@
-import { micromark } from "micromark";
-import React, { useEffect, useRef, useState } from "react";
-import { codeToHtml } from "shiki";
+import React from "react";
+import { AnyBlock } from "../../blocks";
+import { Block } from "../Block/Block";
 import styles from "./ChatHistory.module.css";
 
-type ThinkingProps = {
-  thinking: string;
+type DividerProps = {
+  prev: AnyBlock | null;
+  next: AnyBlock | null;
 };
-const _Thinking: React.FC<ThinkingProps> = ({ thinking }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className={styles.thinking}>
-      <div>
-        <span style={{ opacity: open ? 1 : 0.5 }}>Thinking process</span>
-        <button onClick={() => setOpen(!open)}>{open ? "Hide" : "Show"}</button>
-      </div>
-      {open ? <pre>{thinking}</pre> : null}
-    </div>
-  );
+const Divider: React.FC<DividerProps> = ({ prev, next }) => {
+  const GAP_SM = 0.5;
+  const GAP_MD = 1;
+  function getHeight() {
+    if (!prev || !next) return 0;
+    if (
+      (prev.type === "text" && prev.role === "user") ||
+      (next.type === "text" && next.role === "user")
+    ) {
+      return 1.75 * GAP_MD;
+    }
+    if (prev.type === "thinking") {
+      if (next.type === "thinking") return GAP_SM;
+      return GAP_MD;
+    }
+    if (prev.type === "tool_call") {
+      if (next.type === "tool_call") return GAP_SM;
+      return GAP_MD;
+    }
+    if (prev.type === "text") {
+      return GAP_MD;
+    }
+    return 0;
+  }
+  return <div style={{ height: `${getHeight()}em` }} />;
 };
-const Thinking = React.memo(_Thinking);
-
-type MessageProps = {
-  role: string;
-  thinking?: string;
-  content: string;
-};
-const _Message: React.FC<MessageProps> = ({ role, thinking, content }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!ref.current) return;
-      const pres = ref.current.querySelectorAll("& > pre");
-      for (const pre of Array.from(pres)) {
-        if (pre.classList.contains("shiki")) continue;
-        const code = pre.querySelector("& > code");
-        if (!code) continue;
-        const lang =
-          code
-            .getAttribute("class")
-            ?.split(" ")
-            .find((i) => i.startsWith("language-"))
-            ?.slice(9) ?? "plaintext";
-        codeToHtml(code.textContent || "", {
-          lang: lang,
-          theme: "github-dark-dimmed",
-        }).then((html) => {
-          const div = document.createElement("div");
-          div.innerHTML = html;
-          pre.replaceWith(div.firstChild!);
-        });
-      }
-    }, 200);
-    return () => clearTimeout(timeout);
-  }, [thinking, content]);
-  useEffect(() => {
-    const container = ref.current;
-    if (!container) return;
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (!(node instanceof HTMLElement && node.tagName === "PRE")) continue;
-          const code = node.querySelector("code");
-          if (!code) continue;
-          // add copy buttons (top and bottom)
-          for (const pos of [{ top: 8 }]) {
-            const btn = document.createElement("button");
-            btn.textContent = "Copy";
-            btn.style.top = pos.top ? `${pos.top}px` : "auto";
-            btn.classList.add("copy");
-            btn.addEventListener("click", () => {
-              const text = code.textContent;
-              if (!text) return;
-              navigator.clipboard.writeText(text);
-              btn.textContent = "Copied!";
-              setTimeout(() => {
-                btn.textContent = "Copy";
-              }, 2000);
-            });
-            node.appendChild(btn);
-          }
-        }
-      }
-    });
-    observer.observe(container, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [ref]);
-  return (
-    <>
-      {thinking ? <Thinking thinking={thinking} /> : null}
-      <div
-        ref={ref}
-        className={styles.message}
-        style={{ opacity: role === "user" ? 0.67 : 1 }}
-        dangerouslySetInnerHTML={{ __html: micromark(content) }}
-      />
-    </>
-  );
-};
-const Message = React.memo(_Message);
 
 type ChatHistoryProps = {
-  history: {
-    id: string;
-    role: string;
-    thinking?: string;
-    content: string;
-  }[];
+  scrollRef: React.RefObject<HTMLDivElement>;
+  blocks: AnyBlock[];
 };
-const ChatHistory: React.FC<ChatHistoryProps> = ({ history }) => {
-  const scrollViewRef = useRef<HTMLDivElement>(null);
-  // useEffect(() => {
-  //   if (!scrollViewRef.current) return;
-  //   scrollViewRef.current.scrollBy({
-  //     top: scrollViewRef.current.scrollHeight,
-  //     behavior: "smooth",
-  //   });
-  // }, [history.map((i) => i.id + i.content.trim()).join("_")]);
+const ChatHistory: React.FC<ChatHistoryProps> = ({ scrollRef, blocks }) => {
   return (
     <div className={styles.root}>
-      <div className={styles.history} ref={scrollViewRef}>
-        {history.map((item) => (
-          <Message key={item.id} role={item.role} thinking={item.thinking} content={item.content} />
-        ))}
+      <div className={styles.history} ref={scrollRef}>
+        {blocks
+          .filter((i) => {
+            if (i.type === "text" && i.content.trim() === "") return false;
+            return true;
+          })
+          .flatMap((i, idx) => {
+            const prev = idx === 0 ? null : blocks[idx - 1] ?? null;
+            switch (i.type) {
+              case "text":
+                if (i.content.trim() === "") return [];
+                return [
+                  <Divider key={i.id + "_divider"} prev={prev} next={i} />,
+                  <Block.Text key={i.id} block={i} />,
+                ];
+              case "thinking":
+                return [
+                  <Divider key={i.id + "_divider"} prev={prev} next={i} />,
+                  <Block.Thinking key={i.id} active={idx === blocks.length - 1} block={i} />,
+                ];
+              case "tool_call":
+                return [
+                  <Divider key={i.id + "_divider"} prev={prev} next={i} />,
+                  <Block.ToolCall key={i.id} active={idx === blocks.length - 1} block={i} />,
+                ];
+              default:
+                return null;
+            }
+          })}
       </div>
     </div>
   );

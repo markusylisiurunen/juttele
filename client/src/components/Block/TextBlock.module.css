@@ -1,0 +1,274 @@
+.root {
+  padding-inline: var(--spacing-padding-x);
+  position: relative;
+}
+.actions {
+  --color-accent: hsl(284, 0%, 20%);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-accent) 20%, transparent),
+    color-mix(in srgb, var(--color-accent) 6%, transparent)
+  );
+
+  --gap: 4px;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+  bottom: 0px;
+  display: inline-flex;
+  left: var(--spacing-padding-x);
+  margin-block-start: 8px;
+  margin-inline-start: -4px;
+  padding-block: 1px;
+  padding-inline: 4px 6px;
+  position: absolute;
+  transform: translateY(calc(100% + var(--gap)));
+  z-index: 999;
+}
+.actions::before {
+  content: "";
+  height: calc(2 * var(--gap));
+  left: 0px;
+  position: absolute;
+  right: 0px;
+  top: calc(-1 * 2 * var(--gap));
+}
+.actions button {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+  padding: 4px 3px;
+  transition: color 90ms linear;
+}
+.actions button:hover {
+  color: var(--color-text);
+}
+.actions span {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+  display: block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  letter-spacing: -0.05em;
+  line-height: 1.2;
+  margin-inline-start: 3px;
+  transition: color 90ms linear;
+}
+.actions:hover span {
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.root:not(:hover) .actions {
+  display: none;
+}
+/* spacing within messages */
+.content {
+  --gap-sm: 0.5em;
+  --gap-md: 1em;
+}
+.content > :first-child {
+  margin-block-start: 0px !important;
+}
+.content > :last-child {
+  margin-block-end: 0px !important;
+}
+.content h1,
+.content h2,
+.content h3,
+.content h4,
+.content h5,
+.content h6,
+.content p,
+.content ul,
+.content ol,
+.content div:has(> pre) {
+  margin-block: 0px;
+}
+.content h1,
+.content h2,
+.content h3,
+.content h4,
+.content h5,
+.content h6 {
+  font-size: 1em;
+  font-weight: bold;
+  margin-block: var(--gap-md) var(--gap-sm);
+}
+.content p {
+  margin-block: var(--gap-md);
+}
+.content h1 + p,
+.content h2 + p,
+.content h3 + p,
+.content h4 + p,
+.content h5 + p,
+.content h6 + p {
+  margin-block-start: var(--gap-sm);
+}
+.content blockquote {
+  margin-block: var(--gap-md);
+}
+.content blockquote blockquote {
+  margin-block: var(--gap-sm);
+}
+.content blockquote p {
+  margin-block: 0px;
+}
+.content ul,
+.content ol {
+  margin-block: var(--gap-md);
+}
+.content ul ul,
+.content ul ol,
+.content ol ul,
+.content ol ol {
+  margin-block-end: 0px;
+  margin-block-start: calc(var(--gap-sm) / 3);
+}
+.content div:has(> pre) {
+  margin-block: var(--gap-md);
+}
+.content div > pre {
+  margin-block: 0px;
+}
+.content hr {
+  margin-block: var(--gap-md);
+}
+.content div:has(> table) {
+  margin-block: var(--gap-md);
+}
+.content :global(.katex-display) {
+  margin-block: calc(1.5 * var(--gap-md));
+}
+/* dividers */
+.content hr {
+  border-block-end: none;
+  border-block-start: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-inline: none;
+}
+/* links */
+.content a {
+  color: var(--color-text-link);
+  text-decoration-color: color-mix(in srgb, currentColor 20%, transparent);
+  text-decoration-thickness: 2px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* lists */
+.content ul,
+.content ol {
+  padding-inline-start: 2em;
+}
+.content li + li {
+  margin-block-start: calc(var(--gap-sm) / 3);
+}
+/* blockquote */
+.content blockquote {
+  margin-inline: 0px;
+  padding-inline-start: 1em;
+  position: relative;
+}
+.content blockquote::before {
+  background: color-mix(in srgb, var(--color-text) 12%, transparent);
+  border-radius: 999px;
+  bottom: 0px;
+  content: "";
+  display: block;
+  left: 0px;
+  position: absolute;
+  top: 0px;
+  width: 3px;
+}
+/* checkbox */
+.content input[type="checkbox"] {
+  background: color-mix(in srgb, var(--color-text) 5%, var(--color-bg));
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  box-shadow: none;
+  display: inline-block;
+  height: 15px;
+  margin: 0px;
+  width: 15px;
+}
+/* tables */
+.content div:has(> table) {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.content table {
+  --color-border: color-mix(in srgb, var(--color-text) 12%, var(--color-bg));
+  background: color-mix(in srgb, var(--color-text) 2%, transparent);
+  border-collapse: collapse;
+  border: none;
+  min-width: 100%;
+}
+.content table th,
+.content table td {
+  padding-inline: 8px;
+  padding-block: 6px;
+  text-align: left;
+}
+.content table th:not(:first-child),
+.content table td:not(:first-child) {
+  border-inline-start: 1px solid var(--color-border);
+}
+.content table th {
+  border-bottom: 1px solid var(--color-border);
+  font-weight: bold;
+  white-space: nowrap;
+}
+/* math */
+.content p :global(.katex) {
+  font-size: 1.1em;
+}
+/* inline code */
+.content :not(pre) > code {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-text) 5%, transparent),
+    color-mix(in srgb, var(--color-text) 2.5%, transparent)
+  );
+
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+  letter-spacing: -0.05em;
+  padding-block: 0.5px;
+  padding-inline: 4px;
+}
+/* code blocks */
+.content div:has(> pre) > div:first-child {
+  align-items: center;
+  display: flex;
+  padding-block-end: 2px;
+}
+.content div:has(> pre) > div:first-child span {
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  letter-spacing: initial;
+  line-height: 1.2;
+}
+.content div:has(> pre) > div:first-child button {
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  margin-inline-start: -4px;
+  margin-inline-end: 2px;
+  padding: 4px;
+  transition: color 90ms linear;
+}
+.content div:has(> pre) > div:first-child button:hover {
+  color: var(--color-text);
+}
+.content pre {
+  appearance: none;
+  background: color-mix(in srgb, var(--color-text) 4%, transparent) !important;
+  font-size: 13px;
+  margin-inline: calc(-1 * var(--spacing-padding-x));
+  overflow-x: auto;
+  padding-block: 12px;
+  padding-inline: var(--spacing-padding-x);
+  position: relative;
+}
+.content pre > code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  letter-spacing: initial;
+  line-height: 1.4;
+}

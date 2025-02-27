@@ -1,0 +1,7 @@
+version: "3"
+
+tasks:
+  dev:
+    cmds:
+      - reflex --regex='\.go$' --decoration=none --start-service -- sh -c 'go run ./cmd/dev'
+    silent: true

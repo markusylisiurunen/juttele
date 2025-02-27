@@ -1,0 +1,79 @@
+.root {
+  padding-inline: var(--spacing-padding-x);
+}
+.container {
+  align-items: center;
+  display: flex;
+  justify-content: flex-start;
+}
+.root {
+  --color-accent: hsl(284, 0%, 25%);
+}
+.root:where([data-active]) .block {
+  --color-accent: hsl(265, 100%, 60%);
+}
+.block {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-accent) 20%, transparent),
+    color-mix(in srgb, var(--color-accent) 6%, transparent)
+  );
+
+  align-items: center;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+  display: flex;
+  gap: 4px;
+  padding-block: 5px;
+  padding-inline: 6px 12px;
+  transition: background 200ms linear, box-shadow 200ms linear, border 200ms linear;
+}
+.root:not(:where([data-active])) .block {
+  box-shadow: 0 0 0 0 transparent;
+}
+.root:where([data-active]) .block {
+  box-shadow: 0 0 16px 0 color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.block > svg {
+  color: color-mix(in srgb, var(--color-text) 50%, var(--color-accent));
+  display: block;
+  flex-shrink: 0;
+  opacity: 0.4;
+}
+.block > span {
+  display: block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+  letter-spacing: -0.05em;
+  padding-block-start: 0.5px;
+}
+.copy {
+  align-items: center;
+  appearance: none;
+  aspect-ratio: 1 / 1;
+  border-radius: 0px;
+  border: none;
+  color: color-mix(in srgb, var(--color-text) 33%, var(--color-accent));
+  display: flex;
+  flex-shrink: 0;
+  height: 28px;
+  justify-content: center;
+  margin-inline-start: 4px;
+  outline: none;
+  padding: 0px;
+  transition: color 90ms linear;
+}
+.copy:hover {
+  color: var(--color-text);
+}
+.preview {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+  font-size: 14px;
+  margin-block-start: 0.67em;
+}
+.preview p {
+  margin-block: 0px;
+}
+.preview p + p {
+  margin-block-start: 0.67em;
+}

@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/markusylisiurunen/juttele/internal/util"
 )
 
 var _ Model = (*googleModel)(nil)
@@ -39,10 +41,11 @@ func WithGoogleModelDisplayName(name string) googleModelOption {
 func WithGoogleModelPersonality(name string, systemPrompt string) googleModelOption {
 	return func(m *googleModel) {
 		id := xxhash.New()
-		must(id.WriteString("google"))
-		must(id.WriteString("personality"))
-		must(id.WriteString(m.id))
-		must(id.WriteString(name))
+		util.Must(id.WriteString("google"))
+		util.Must(id.WriteString("personality"))
+		util.Must(id.WriteString(m.id))
+		util.Must(id.WriteString(m.displayName))
+		util.Must(id.WriteString(name))
 		m.personalities = append(m.personalities, googleModelPersonality{
 			id:           strconv.FormatUint(id.Sum64(), 10),
 			name:         name,
@@ -53,10 +56,9 @@ func WithGoogleModelPersonality(name string, systemPrompt string) googleModelOpt
 
 func NewGoogleModel(apiKey string, modelName string, opts ...googleModelOption) *googleModel {
 	id := xxhash.New()
-	must(id.WriteString("google"))
-	must(id.WriteString(modelName))
+	util.Must(id.WriteString("google"))
+	util.Must(id.WriteString(modelName))
 	m := &googleModel{
-		id:            "google_" + strconv.FormatUint(id.Sum64(), 10),
 		apiKey:        apiKey,
 		modelName:     modelName,
 		displayName:   modelName,
@@ -65,6 +67,8 @@ func NewGoogleModel(apiKey string, modelName string, opts ...googleModelOption) 
 	for _, opt := range opts {
 		opt(m)
 	}
+	util.Must(id.WriteString(m.displayName))
+	m.id = "google_" + strconv.FormatUint(id.Sum64(), 10)
 	return m
 }
 
@@ -84,74 +88,81 @@ func (m *googleModel) GetModelInfo() ModelInfo {
 	}
 }
 
-func (m *googleModel) StreamCompletion(ctx context.Context, history []Message) <-chan Chunk {
-	return streamOpenAICompatibleCompletion(ctx,
-		func(ctx context.Context) (*http.Response, error) {
-			type reqContentPart struct {
-				Text string `json:"text"`
-			}
-			type reqContent struct {
-				Role  *string          `json:"role,omitempty"`
-				Parts []reqContentPart `json:"parts"`
-			}
-			type reqBody struct {
-				SystemInstruction *reqContent  `json:"systemInstruction,omitempty"`
-				Contents          []reqContent `json:"contents"`
-			}
-			b := reqBody{
-				Contents: make([]reqContent, 0),
-			}
-			// add system instructions if they exist
-			systemMessageIdx := slices.IndexFunc(history, func(m Message) bool {
-				return m.role == SystemRole
-			})
-			if systemMessageIdx != -1 {
-				b.SystemInstruction = &reqContent{
-					Parts: []reqContentPart{
-						{Text: history[systemMessageIdx].content},
-					},
+func (m *googleModel) StreamCompletion(ctx context.Context, systemPrompt string, history []ChatEvent, _ CompletionOpts) <-chan ChatEvent {
+	out := make(chan ChatEvent)
+	go func() {
+		defer close(out)
+		chunks := callOpenAICompatibleAPI(ctx,
+			func(ctx context.Context) (*http.Response, error) {
+				type reqContentPart struct {
+					Text string `json:"text"`
 				}
-			}
-			// add the message history
-			for _, m := range history {
-				if m.role == UserRole {
-					role := "user"
-					b.Contents = append(b.Contents, reqContent{
-						Role: &role,
+				type reqContent struct {
+					Role  *string          `json:"role,omitempty"`
+					Parts []reqContentPart `json:"parts"`
+				}
+				type reqBody struct {
+					SystemInstruction *reqContent  `json:"systemInstruction,omitempty"`
+					Contents          []reqContent `json:"contents"`
+				}
+				b := reqBody{
+					Contents: make([]reqContent, 0),
+				}
+				// add system instructions if they exist
+				if systemPrompt != "" {
+					loc, _ := time.LoadLocation("Europe/Helsinki")
+					now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
+					b.SystemInstruction = &reqContent{
 						Parts: []reqContentPart{
-							{Text: m.content},
+							{Text: strings.ReplaceAll(systemPrompt, "{{current_time}}", now)},
 						},
-					})
+					}
 				}
-				if m.role == AssistantRole {
-					role := "model"
-					b.Contents = append(b.Contents, reqContent{
-						Role: &role,
-						Parts: []reqContentPart{
-							{Text: m.content},
-						},
-					})
+				// add the message history
+				for _, i := range history {
+					switch i := i.(type) {
+					case *AssistantMessageChatEvent:
+						role := "model"
+						b.Contents = append(b.Contents, reqContent{
+							Role:  &role,
+							Parts: []reqContentPart{{Text: i.content}},
+						})
+					case *UserMessageChatEvent:
+						role := "user"
+						b.Contents = append(b.Contents, reqContent{
+							Role:  &role,
+							Parts: []reqContentPart{{Text: i.content}},
+						})
+					}
 				}
+				var buf bytes.Buffer
+				enc := json.NewEncoder(&buf)
+				enc.SetEscapeHTML(false)
+				if err := enc.Encode(b); err != nil {
+					return nil, err
+				}
+				req, err := http.NewRequestWithContext(ctx,
+					http.MethodPost, fmt.Sprintf("https://generativelanguage.googleapis.com/v1alpha/models/%s:streamGenerateContent", m.modelName),
+					&buf,
+				)
+				if err != nil {
+					return nil, err
+				}
+				q := req.URL.Query()
+				q.Add("alt", "sse")
+				q.Add("key", m.apiKey)
+				req.URL.RawQuery = q.Encode()
+				req.Header.Set("Content-Type", "application/json")
+				return http.DefaultClient.Do(req)
+			},
+		)
+		resp := NewAssistantMessageChatEvent("")
+		out <- resp
+		for r := range chunks {
+			if r.Err != nil {
+				fmt.Printf("error: %v\n", r.Err)
+				return
 			}
-			body, err := json.Marshal(b)
-			if err != nil {
-				return nil, err
-			}
-			req, err := http.NewRequestWithContext(ctx,
-				http.MethodPost, fmt.Sprintf("https://generativelanguage.googleapis.com/v1alpha/models/%s:streamGenerateContent", m.modelName),
-				bytes.NewReader(body),
-			)
-			if err != nil {
-				return nil, err
-			}
-			q := req.URL.Query()
-			q.Add("alt", "sse")
-			q.Add("key", m.apiKey)
-			req.URL.RawQuery = q.Encode()
-			req.Header.Set("Content-Type", "application/json")
-			return http.DefaultClient.Do(req)
-		},
-		func(chunk []byte) (Chunk, error) {
 			type respBody struct {
 				Candidates []struct {
 					Content struct {
@@ -162,16 +173,19 @@ func (m *googleModel) StreamCompletion(ctx context.Context, history []Message) <
 				} `json:"candidates"`
 			}
 			var b respBody
-			if err := json.Unmarshal([]byte(chunk), &b); err != nil {
-				return nil, err
+			if err := json.Unmarshal([]byte(r.Val), &b); err != nil {
+				fmt.Printf("error: %v\n", err)
+				return
 			}
 			if len(b.Candidates) == 0 {
-				return nil, nil
+				return
 			}
 			if len(b.Candidates[0].Content.Parts) == 0 {
-				return nil, nil
+				return
 			}
-			return ContentChunk(b.Candidates[0].Content.Parts[0].Text), nil
-		},
-	)
+			resp.content += b.Candidates[0].Content.Parts[0].Text
+			out <- resp
+		}
+	}()
+	return out
 }

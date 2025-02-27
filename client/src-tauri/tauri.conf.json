@@ -10,15 +10,14 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Juttele",
-        "width": 720,
-        "height": 960
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
+    }
+  },
+  "plugins": {
+    "fs": {
+      "requireLiteralLeadingDot": false
     }
   },
   "bundle": {

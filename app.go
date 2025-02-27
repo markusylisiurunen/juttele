@@ -2,32 +2,47 @@ package juttele
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
-	"strings"
+
+	"github.com/markusylisiurunen/juttele/internal/middleware"
+	"github.com/markusylisiurunen/juttele/internal/repo"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type App struct {
-	token  string
+	// config options
+	configToken      string
+	configDataFolder string
+
+	// runtime state
+	db     *sql.DB
+	repo   *repo.Repository
+	router *http.ServeMux
 	models []Model
-	mux    *http.ServeMux
 }
 
-type option func(*App)
+type appOption func(*App)
 
-func WithModel(model Model) option {
+func WithDataFolder(folder string) appOption {
+	return func(app *App) {
+		app.configDataFolder = folder
+	}
+}
+
+func WithModel(model Model) appOption {
 	return func(app *App) {
 		app.models = append(app.models, model)
 	}
 }
 
-func New(token string, opts ...option) *App {
+func New(token string, opts ...appOption) *App {
 	app := new(App)
-	app.token = token
+	app.configDataFolder = "./.data"
+	app.configToken = token
+	app.router = http.NewServeMux()
 	app.models = make([]Model, 0)
-	app.mux = http.NewServeMux()
-	app.mux.Handle("/models", app.corsMiddleware(app.authMiddleware(app.handleModelsRoute)))
-	app.mux.Handle("/stream", app.corsMiddleware(app.authMiddleware(app.handleStreamRoute)))
 	for _, opt := range opts {
 		opt(app)
 	}
@@ -35,52 +50,72 @@ func New(token string, opts ...option) *App {
 }
 
 func (app *App) ListenAndServe(ctx context.Context) error {
-	// validate models
+	type initFunc = func(ctx context.Context) error
+	initFuncs := []initFunc{
+		app.initModels,
+		app.initDatabase,
+		app.initRoutes,
+	}
+	for _, initFunc := range initFuncs {
+		if err := initFunc(ctx); err != nil {
+			return err
+		}
+	}
+	server := &http.Server{
+		Addr:    "0.0.0.0:8765",
+		Handler: middleware.Cors()(app.router),
+	}
+	go func() {
+		<-ctx.Done()
+		server.Shutdown(ctx)
+		app.db.Close()
+	}()
+	err := server.ListenAndServe()
+	if err == http.ErrServerClosed {
+		return nil
+	}
+	return err
+}
+
+// ---
+
+func (app *App) initModels(ctx context.Context) error {
 	for _, model := range app.models {
 		info := model.GetModelInfo()
 		if len(info.Personalities) == 0 {
 			return fmt.Errorf("model %q has no personalities", info.ID)
 		}
 	}
-	// start server
-	server := &http.Server{
-		Addr:    "0.0.0.0:8765",
-		Handler: app.mux,
+	return nil
+}
+
+func (app *App) initDatabase(ctx context.Context) error {
+	client, err := sql.Open("sqlite3",
+		fmt.Sprintf("file:%s/juttele.db?_fk=1", app.configDataFolder))
+	if err != nil {
+		return err
 	}
-	go func() {
-		<-ctx.Done()
-		server.Shutdown(ctx)
-	}()
-	return server.ListenAndServe()
+	app.db = client
+	if err := repo.Migrate(ctx, client); err != nil {
+		return err
+	}
+	app.repo = repo.New(client)
+	return nil
 }
 
-func (app *App) corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-		w.Header().Set("Access-Control-Allow-Headers", "*")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (app *App) authMiddleware(nextFunc http.HandlerFunc) http.Handler {
-	next := http.HandlerFunc(nextFunc)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		token := strings.TrimPrefix(auth, "Bearer ")
-		if token != app.token {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+func (app *App) initRoutes(ctx context.Context) error {
+	type mountable struct {
+		pattern string
+		handler http.HandlerFunc
+	}
+	mountables := []mountable{
+		{"GET /config", app.configRouteHandler},
+		{"GET /data", app.dataRouteHandler},
+		{"POST /rpc", app.rpcRouteHandler},
+		{"GET /chats/{id}", app.sendRouteHandler},
+	}
+	for _, i := range mountables {
+		app.router.Handle(i.pattern, middleware.Auth(app.configToken)(i.handler))
+	}
+	return nil
 }

@@ -1,0 +1,8 @@
+<system_time>
+{{current_time}}
+</system_time>
+
+<instructions>
+- Match the language – most likely English or Finnish
+- Do not use emojis
+</instructions>
