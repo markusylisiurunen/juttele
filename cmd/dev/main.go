@@ -17,6 +17,7 @@ var rawSystemPrompt string
 func main() {
 	var (
 		anthropicToken  = os.Getenv("ANTHROPIC_TOKEN")
+		deepSeekToken   = os.Getenv("DEEPSEEK_TOKEN")
 		googleToken     = os.Getenv("GOOGLE_TOKEN")
 		groqToken       = os.Getenv("GROQ_TOKEN")
 		openRouterToken = os.Getenv("OPEN_ROUTER_TOKEN")
@@ -36,6 +37,10 @@ func main() {
 			juttele.WithOpenRouterModelPersonality("Raw", rawSystemPrompt),
 			juttele.WithOpenRouterModelTools(juttele.NewMemoryToolBundle("./.data")...),
 		)
+		deepseekR1 = juttele.NewDeepSeekModel(deepSeekToken, "deepseek-reasoner",
+			juttele.WithDeepSeekModelDisplayName("DeepSeek R1"),
+			juttele.WithDeepSeekModelPersonality("Raw", rawSystemPrompt),
+		)
 		deepseekR1Llama70b = juttele.NewGroqModel(groqToken, "deepseek-r1-distill-llama-70b",
 			juttele.WithGroqModelDisplayName("DeepSeek R1 (Llama 70B)"),
 			juttele.WithGroqModelPersonality("Raw", rawSystemPrompt),
@@ -49,6 +54,7 @@ func main() {
 		juttele.WithModel(claude37Sonnet),
 		juttele.WithModel(claude37SonnetThinking),
 		juttele.WithModel(gpt4o),
+		juttele.WithModel(deepseekR1),
 		juttele.WithModel(deepseekR1Llama70b),
 		juttele.WithModel(gemini20FlashThinking),
 	)
