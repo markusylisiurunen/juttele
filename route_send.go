@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
-	"math/rand"
 	"net/http"
 	"slices"
 	"strconv"
@@ -14,7 +12,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/markusylisiurunen/juttele/internal/repo"
 	"github.com/markusylisiurunen/juttele/internal/util/jsonrpc"
-	"github.com/tidwall/gjson"
 )
 
 type sendRequestTool struct {
@@ -36,13 +33,13 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
-func writeWSError(conn *websocket.Conn, message string, err error) {
+func writeWSError(proxy *webSocketProxy, message string, err error) {
 	errMsg := message
 	if err != nil {
 		errMsg = fmt.Sprintf("%s: %v", message, err)
 	}
 	resp := jsonrpc.NewNotification("error", map[string]any{"message": errMsg})
-	conn.WriteJSON(resp)
+	proxy.write(resp)
 }
 
 func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
@@ -57,23 +54,25 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("error upgrading to websocket: %v", err), http.StatusInternalServerError)
 		return
 	}
-	defer conn.Close()
+	proxy := newWebSocketProxy(conn)
+	defer proxy.close()
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		return
 	}
+	go proxy.readLoop()
 	var v sendRequest
 	if err := json.Unmarshal(msg, &v); err != nil {
-		writeWSError(conn, "error decoding request", err)
+		writeWSError(proxy, "error decoding request", err)
 		return
 	}
 	if chatID <= 0 || v.ModelID == "" || v.PersonalityID == "" || v.Content == "" {
-		writeWSError(conn, "chat ID, model ID, personality ID, and content must be provided", nil)
+		writeWSError(proxy, "chat ID, model ID, personality ID, and content must be provided", nil)
 		return
 	}
 	modelIdx := slices.IndexFunc(app.models, func(model Model) bool { return model.GetModelInfo().ID == v.ModelID })
 	if modelIdx == -1 {
-		writeWSError(conn, fmt.Sprintf("model with ID %q not found", v.ModelID), nil)
+		writeWSError(proxy, fmt.Sprintf("model with ID %q not found", v.ModelID), nil)
 		return
 	}
 	model := app.models[modelIdx]
@@ -86,12 +85,12 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if systemPrompt == nil {
-		writeWSError(conn, fmt.Sprintf("personality with ID %q not found", v.PersonalityID), nil)
+		writeWSError(proxy, fmt.Sprintf("personality with ID %q not found", v.PersonalityID), nil)
 		return
 	}
 	events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{ChatID: chatID})
 	if err != nil {
-		writeWSError(conn, "error listing chat events", err)
+		writeWSError(proxy, "error listing chat events", err)
 		return
 	}
 	history := make([]ChatEvent, 0, 1+len(events.Items))
@@ -101,55 +100,39 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		event, err := parseChatEvent(i.CreatedAt, i.UUID, i.Kind, i.Content)
 		if err != nil {
-			writeWSError(conn, "error parsing chat event", err)
+			writeWSError(proxy, "error parsing chat event", err)
 			return
 		}
 		history = append(history, event)
 	}
 	history = append(history, NewUserMessageChatEvent(v.Content))
 	if err := app.upsertChatEvent(ctx, chatID, NewUserMessageChatEvent(v.Content)); err != nil {
-		writeWSError(conn, "error upserting chat event", err)
+		writeWSError(proxy, "error upserting chat event", err)
 		return
 	}
-	opts := CompletionOpts{}
-	opts.UseTools = v.UseTools
-	if len(v.Tools) > 0 {
-		opts.ClientTools = make([]Tool, len(v.Tools))
-		for i, j := range v.Tools {
-			// FIXME: this is absolute garbage
-			opts.ClientTools[i] = NewFuncTool(j.Name, j.Spec, func(ctx context.Context, args string) (string, error) {
-				id := int64(math.Round(rand.Float64() * 256))
-				req := jsonrpc.NewRequest(int(id), "tool_call", map[string]any{
-					"name": j.Name,
-					"args": args,
-				})
-				if err := conn.WriteJSON(req); err != nil {
-					return "", err
-				}
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					return "", err
-				}
-				if gjson.GetBytes(msg, "id").Int() != id {
-					return "", fmt.Errorf("tool call failed: invalid ID %d", id)
-				}
-				result := gjson.GetBytes(msg, "result")
-				if !result.Exists() {
-					return "", fmt.Errorf("tool call failed: %s", msg)
-				}
-				return result.String(), nil
-			})
+	opts := StreamCompletionOpts{
+		SystemPrompt: *systemPrompt,
+		Tools:        NewToolCatalog(),
+		UseTools:     v.UseTools,
+	}
+	if opts.UseTools {
+		for _, j := range app.tools {
+			opts.Tools.Register(j)
+		}
+		for _, j := range v.Tools {
+			opts.Tools.Register(newClientTool(proxy, j.Name, j.Spec))
 		}
 	}
-	out := model.StreamCompletion(r.Context(), *systemPrompt, history, opts)
+	out := model.StreamCompletion(r.Context(), history, opts)
 	for i := range out {
-		if i == nil {
-			continue
+		if i.Err != nil {
+			writeWSError(proxy, "error streaming completion", i.Err)
+			return
 		}
-		switch i := i.(type) {
+		switch i := i.Val.(type) {
 		case *AssistantMessageChatEvent:
 			if err := app.upsertChatEvent(ctx, chatID, i); err != nil {
-				writeWSError(conn, "error upserting chat event", err)
+				writeWSError(proxy, "error upserting chat event", err)
 				return
 			}
 			if len(i.reasoning) > 0 {
@@ -187,7 +170,7 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		case *ToolMessageChatEvent:
 			if err := app.upsertChatEvent(ctx, chatID, i); err != nil {
-				writeWSError(conn, "error upserting chat event", err)
+				writeWSError(proxy, "error upserting chat event", err)
 				return
 			}
 		}

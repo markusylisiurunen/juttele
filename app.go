@@ -21,6 +21,7 @@ type App struct {
 	repo   *repo.Repository
 	router *http.ServeMux
 	models []Model
+	tools  []Tool
 }
 
 type appOption func(*App)
@@ -37,12 +38,19 @@ func WithModel(model Model) appOption {
 	}
 }
 
+func WithToolBundle(tools ToolBundle) appOption {
+	return func(app *App) {
+		app.tools = append(app.tools, tools.Tools()...)
+	}
+}
+
 func New(token string, opts ...appOption) *App {
 	app := new(App)
 	app.configDataFolder = "./.data"
 	app.configToken = token
 	app.router = http.NewServeMux()
 	app.models = make([]Model, 0)
+	app.tools = make([]Tool, 0)
 	for _, opt := range opts {
 		opt(app)
 	}

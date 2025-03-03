@@ -140,17 +140,19 @@ Name: A conversation about the weather
 		"{{conversation}}",
 		string(util.Must(json.MarshalIndent(conversation, "", "  "))),
 	)
-	opts := CompletionOpts{}
-	out := model.StreamCompletion(ctx, systemPrompt, []ChatEvent{
+	opts := StreamCompletionOpts{
+		SystemPrompt: systemPrompt,
+	}
+	out := model.StreamCompletion(ctx, []ChatEvent{
 		NewUserMessageChatEvent("Please rename the chat."),
 		NewAssistantMessageChatEvent("Name:"),
 	}, opts)
 	var completion string
 	for i := range out {
-		if i == nil {
-			continue
+		if i.Err != nil {
+			fmt.Printf("error getting completion: %v", i.Err)
 		}
-		switch i := i.(type) {
+		switch i := i.Val.(type) {
 		case *AssistantMessageChatEvent:
 			completion = i.content
 			continue

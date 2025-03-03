@@ -205,6 +205,16 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
         );
       } catch (error) {
         console.error(error);
+        const message = error instanceof Error ? error.message : "Something went wrong.";
+        setBlocks((blocks) => [
+          ...blocks,
+          {
+            id: Date.now().toString(),
+            type: "text",
+            role: "assistant",
+            content: `Error: ${message}`,
+          },
+        ]);
       }
     });
   }

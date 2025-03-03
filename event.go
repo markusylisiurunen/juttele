@@ -28,15 +28,34 @@ func parseChatEvent(ts time.Time, uuid string, kind string, content []byte) (Cha
 		var v AssistantMessageChatEvent
 		v.ts = ts
 		v.uuid = uuid
+		v.meta = map[string]any{}
+		if gjson.GetBytes(content, "meta").Exists() {
+			meta := gjson.GetBytes(content, "meta").Map()
+			for mk, mv := range meta {
+				switch mv.Type {
+				case gjson.Null:
+					v.meta[mk] = nil
+				case gjson.True:
+					v.meta[mk] = true
+				case gjson.False:
+					v.meta[mk] = false
+				case gjson.Number:
+					v.meta[mk] = mv.Float()
+				case gjson.String:
+					v.meta[mk] = mv.String()
+				default:
+					return nil, fmt.Errorf("unknown meta value type: %s", mv.Type.String())
+				}
+			}
+		}
 		v.reasoning = gjson.GetBytes(content, "reasoning").String()
 		v.content = gjson.GetBytes(content, "content").String()
 		if gjson.GetBytes(content, "tool_calls").Exists() {
 			toolCalls := gjson.GetBytes(content, "tool_calls").Array()
-			v.toolCalls = make([]assistantMessageToolCall, len(toolCalls))
+			v.toolCalls = make([]AssistantMessageChatEventToolCall, len(toolCalls))
 			for i, t := range toolCalls {
-				v.toolCalls[i] = assistantMessageToolCall{
+				v.toolCalls[i] = AssistantMessageChatEventToolCall{
 					ID:       t.Get("id").String(),
-					Type:     t.Get("type").String(),
 					FuncName: t.Get("function.name").String(),
 					FuncArgs: t.Get("function.arguments").String(),
 				}
@@ -63,9 +82,8 @@ func parseChatEvent(ts time.Time, uuid string, kind string, content []byte) (Cha
 
 //---
 
-type assistantMessageToolCall struct {
+type AssistantMessageChatEventToolCall struct {
 	ID       string
-	Type     string
 	FuncName string
 	FuncArgs string
 }
@@ -73,19 +91,29 @@ type assistantMessageToolCall struct {
 type AssistantMessageChatEvent struct {
 	ts        time.Time
 	uuid      string
+	meta      map[string]any
 	reasoning string
 	content   string
-	toolCalls []assistantMessageToolCall
+	toolCalls []AssistantMessageChatEventToolCall
 }
 
 func NewAssistantMessageChatEvent(content string) *AssistantMessageChatEvent {
 	return &AssistantMessageChatEvent{
 		time.Now(),
 		uuid.Must(uuid.NewV7()).String(),
+		map[string]any{},
 		"",
 		content,
 		nil,
 	}
+}
+
+func (e *AssistantMessageChatEvent) GetMeta(k string) any {
+	return e.meta[k]
+}
+
+func (e *AssistantMessageChatEvent) SetMeta(k string, v any) {
+	e.meta[k] = v
 }
 
 func (e *AssistantMessageChatEvent) getChatEvent() (string, string, []byte) {
@@ -94,28 +122,30 @@ func (e *AssistantMessageChatEvent) getChatEvent() (string, string, []byte) {
 		Args string `json:"arguments"`
 	}
 	type toolCall struct {
-		ID       string        `json:"id"`
-		Type     string        `json:"type"`
-		Function *toolCallFunc `json:"function,omitempty"`
+		ID       string       `json:"id"`
+		Function toolCallFunc `json:"function"`
 	}
 	type content struct {
-		Role      string     `json:"role"`
-		Reasoning string     `json:"reasoning,omitzero"`
-		Content   string     `json:"content"`
-		ToolCalls []toolCall `json:"tool_calls,omitempty"`
+		Role      string         `json:"role"`
+		Meta      map[string]any `json:"meta,omitempty"`
+		Content   string         `json:"content"`
+		Reasoning string         `json:"reasoning,omitzero"`
+		ToolCalls []toolCall     `json:"tool_calls,omitempty"`
 	}
 	c := content{
 		Role:      "assistant",
 		Reasoning: e.reasoning,
 		Content:   e.content,
 	}
+	if len(e.meta) > 0 {
+		c.Meta = e.meta
+	}
 	if len(e.toolCalls) > 0 {
 		toolCalls := make([]toolCall, len(e.toolCalls))
 		for i, t := range e.toolCalls {
 			toolCalls[i] = toolCall{
-				ID:   t.ID,
-				Type: t.Type,
-				Function: &toolCallFunc{
+				ID: t.ID,
+				Function: toolCallFunc{
 					Name: t.FuncName,
 					Args: t.FuncArgs,
 				},
