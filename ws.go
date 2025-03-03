@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/markusylisiurunen/juttele/internal/util/jsonrpc"
@@ -33,13 +34,19 @@ func newWebSocketProxy(conn *websocket.Conn) *webSocketProxy {
 }
 
 func (ws *webSocketProxy) readLoop() {
+	defer ws.close()
 	for {
 		select {
 		case <-ws.closeChan:
 			return
 		default:
+			ws.conn.SetReadDeadline(time.Time{})
 			var res jsonrpc.Response
 			if err := ws.conn.ReadJSON(&res); err != nil {
+				if websocket.IsUnexpectedCloseError(err,
+					websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+					return
+				}
 				continue
 			}
 			ws.pendingMu.RLock()
@@ -49,7 +56,7 @@ func (ws *webSocketProxy) readLoop() {
 				continue
 			}
 			if res.ErrorCode != nil && res.ErrorMessage != nil {
-				ch <- Err[json.RawMessage](fmt.Errorf("%d: %s", *res.ErrorCode, *res.ErrorMessage))
+				ch <- Err[json.RawMessage](fmt.Errorf("rpc error %d: %s", *res.ErrorCode, *res.ErrorMessage))
 				continue
 			}
 			v, ok := (*res.Result).(json.RawMessage)
@@ -63,10 +70,16 @@ func (ws *webSocketProxy) readLoop() {
 }
 
 func (ws *webSocketProxy) write(v any) error {
+	ws.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	return ws.conn.WriteJSON(v)
 }
 
-func (ws *webSocketProxy) rpc(ctx context.Context, method string, params json.RawMessage) (json.RawMessage, error) {
+func (ws *webSocketProxy) rpc(
+	ctx context.Context, method string, params json.RawMessage,
+) (json.RawMessage, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	id := ws.reqID.Add(1)
 	ch := make(chan Result[json.RawMessage], 1)
 	ws.pendingMu.Lock()
@@ -79,8 +92,8 @@ func (ws *webSocketProxy) rpc(ctx context.Context, method string, params json.Ra
 		close(ch)
 	}()
 	req := jsonrpc.NewRequest(id, method, params)
-	if err := ws.conn.WriteJSON(req); err != nil {
-		return nil, err
+	if err := ws.write(req); err != nil {
+		return nil, fmt.Errorf("failed to send rpc request: %w", err)
 	}
 	select {
 	case <-ctx.Done():
@@ -96,13 +109,17 @@ func (ws *webSocketProxy) rpc(ctx context.Context, method string, params json.Ra
 func (ws *webSocketProxy) close() {
 	ws.closeOnce.Do(func() {
 		close(ws.closeChan)
+		ws.conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
+		ws.conn.WriteMessage(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+		)
 		ws.conn.Close()
 		ws.pendingMu.Lock()
-		for _, ch := range ws.pending {
-			ch <- Err[json.RawMessage](context.Canceled)
-			close(ch)
+		for id, ch := range ws.pending {
+			ch <- Err[json.RawMessage](fmt.Errorf("connection closed"))
+			delete(ws.pending, id)
 		}
-		ws.pending = nil
 		ws.pendingMu.Unlock()
 	})
 }

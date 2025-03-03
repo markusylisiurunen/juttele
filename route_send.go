@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/markusylisiurunen/juttele/internal/repo"
@@ -56,8 +57,10 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	proxy := newWebSocketProxy(conn)
 	defer proxy.close()
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
+		writeWSError(proxy, "error reading initial message", err)
 		return
 	}
 	go proxy.readLoop()
@@ -141,7 +144,8 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 					"type":    "thinking",
 					"content": i.reasoning,
 				})
-				if err := conn.WriteJSON(msg); err != nil {
+				if err := proxy.write(msg); err != nil {
+					writeWSError(proxy, "error writing block message", err)
 					return
 				}
 			}
@@ -152,7 +156,8 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 					"role":    "assistant",
 					"content": i.content,
 				})
-				if err := conn.WriteJSON(msg); err != nil {
+				if err := proxy.write(msg); err != nil {
+					writeWSError(proxy, "error writing block message", err)
 					return
 				}
 			}
@@ -163,7 +168,8 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 					"name": i.FuncName,
 					"args": i.FuncArgs,
 				})
-				if err := conn.WriteJSON(msg); err != nil {
+				if err := proxy.write(msg); err != nil {
+					writeWSError(proxy, "error writing block message", err)
 					return
 				}
 			}
@@ -174,12 +180,6 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-	}
-	if err := conn.WriteMessage(
-		websocket.CloseMessage,
-		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
-	); err != nil {
-		fmt.Printf("error writing close message: %v", err)
 	}
 }
 
