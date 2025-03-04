@@ -12,6 +12,7 @@ type MessageBoxProps = {
   configAtom: Atom<ConfigResponse>;
   defaultModel?: string;
   defaultPersonality?: string;
+  streaming?: boolean;
   onMessage: (message: string, opts?: { tools?: boolean }) => void;
   onControlModelChange: (modelId: string, personalityId: string) => void;
 };
@@ -20,6 +21,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
   configAtom,
   defaultModel,
   defaultPersonality,
+  streaming,
   onMessage,
   onControlModelChange,
 }) => {
@@ -103,7 +105,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
           <button onClick={onModelChangeClick}>{model?.name}</button>
           <button onClick={onPersonalityChangeClick}>{personality?.name}</button>
         </div>
-        <div></div>
+        <div>{streaming ? <span className={styles.responding}>Responding...</span> : null}</div>
       </div>
     </div>
   );

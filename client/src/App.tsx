@@ -123,6 +123,7 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
   const [title, setTitle] = useState("");
   const [model, setModel] = useState<{ modelId: string; personalityId: string }>();
   const [blocks, setBlocks] = useState([] as AnyBlock[]);
+  const [streaming, setStreaming] = useState(false);
   useEffect(() => {
     const data = dataAtom.get();
     const chat = data.chats.find((chat) => chat.id === chatId);
@@ -179,6 +180,7 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
       });
       // stream the completion
       try {
+        setStreaming(true);
         await streamCompletion(
           BASE_URL,
           API_KEY,
@@ -215,6 +217,8 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
             content: `Error: ${message}`,
           },
         ]);
+      } finally {
+        setStreaming(false);
       }
     });
   }
@@ -252,9 +256,10 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
         onNewChatClick={onReset}
       />
       <div className="app-container">
-        <ChatHistory scrollRef={scrollRef} blocks={blocks} />
+        <ChatHistory blocks={blocks} scrollRef={scrollRef} streaming={streaming} />
         <MessageBox
           configAtom={configAtom}
+          streaming={streaming}
           onMessage={(content, opts) => onMessage(content, { tools: opts?.tools ?? false })}
           onControlModelChange={onControlModelChange}
         />

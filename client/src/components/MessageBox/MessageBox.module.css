@@ -83,3 +83,9 @@
   color: color-mix(in srgb, var(--color-text) 67%, var(--color-accent));
   transition: color 90ms linear;
 }
+.footer .responding {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+  letter-spacing: -0.05em;
+}

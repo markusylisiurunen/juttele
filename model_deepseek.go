@@ -54,7 +54,7 @@ func (m *deepSeekModel) StreamCompletion(
 		out <- Err[ChatEvent](err)
 		return out
 	}
-	return streamOpenAI(resp)
+	return streamOpenAI(resp, false)
 }
 
 func (m *deepSeekModel) request(

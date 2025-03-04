@@ -57,7 +57,7 @@ func (m *openRouterModel) StreamCompletion(
 			out <- Err[ChatEvent](err)
 			return out
 		}
-		return streamOpenAI(resp)
+		return streamOpenAI(resp, m.isNonThinkingThinkingModel())
 	})
 }
 
@@ -185,4 +185,17 @@ func (m *openRouterModel) request(
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	return resp, nil
+}
+
+func (m *openRouterModel) isNonThinkingThinkingModel() bool {
+	prefixes := []string{
+		"openai/o1-",
+		"openai/o3-",
+	}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(m.modelName, prefix) {
+			return true
+		}
+	}
+	return false
 }

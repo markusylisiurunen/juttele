@@ -48,7 +48,7 @@ func streamWithTools(
 	return out
 }
 
-func streamOpenAI(resp *http.Response) <-chan Result[ChatEvent] {
+func streamOpenAI(resp *http.Response, forceThinking bool) <-chan Result[ChatEvent] {
 	type respToolCall struct {
 		Index    int64  `json:"index"`
 		ID       string `json:"id"`
@@ -73,6 +73,9 @@ func streamOpenAI(resp *http.Response) <-chan Result[ChatEvent] {
 		defer close(out)
 		events := streamSSE(resp)
 		msg := NewAssistantMessageChatEvent("")
+		if forceThinking {
+			msg.reasoning = "Thinking, just a second... "
+		}
 		out <- Ok[ChatEvent](msg)
 		toolBuffer := make([]*respToolCall, 64)
 		for event := range events {
@@ -95,7 +98,7 @@ func streamOpenAI(resp *http.Response) <-chan Result[ChatEvent] {
 				continue
 			}
 			delta := b.Choices[0].Delta
-			if delta.Reasoning != "" || delta.ReasoningContent != "" {
+			if !forceThinking && (delta.Reasoning != "" || delta.ReasoningContent != "") {
 				var reasoning string
 				for _, i := range []string{
 					delta.Reasoning,

@@ -1,5 +1,6 @@
 import React from "react";
 import { AnyBlock } from "../../blocks";
+import { BlockProvider } from "../../contexts";
 import { Block } from "../Block/Block";
 import styles from "./ChatHistory.module.css";
 
@@ -35,41 +36,42 @@ const Divider: React.FC<DividerProps> = ({ prev, next }) => {
 };
 
 type ChatHistoryProps = {
-  scrollRef: React.RefObject<HTMLDivElement>;
   blocks: AnyBlock[];
+  scrollRef: React.RefObject<HTMLDivElement>;
+  streaming: boolean;
 };
-const ChatHistory: React.FC<ChatHistoryProps> = ({ scrollRef, blocks }) => {
+const ChatHistory: React.FC<ChatHistoryProps> = ({ blocks, scrollRef, streaming }) => {
+  blocks = blocks.filter((i) => {
+    if (i.type === "text" && i.content.trim() === "") return false;
+    return true;
+  });
   return (
     <div className={styles.root}>
       <div className={styles.history} ref={scrollRef}>
-        {blocks
-          .filter((i) => {
-            if (i.type === "text" && i.content.trim() === "") return false;
-            return true;
-          })
-          .flatMap((i, idx) => {
-            const prev = idx === 0 ? null : blocks[idx - 1] ?? null;
-            switch (i.type) {
-              case "text":
-                if (i.content.trim() === "") return [];
-                return [
-                  <Divider key={i.id + "_divider"} prev={prev} next={i} />,
-                  <Block.Text key={i.id} block={i} />,
-                ];
-              case "thinking":
-                return [
-                  <Divider key={i.id + "_divider"} prev={prev} next={i} />,
-                  <Block.Thinking key={i.id} active={idx === blocks.length - 1} block={i} />,
-                ];
-              case "tool_call":
-                return [
-                  <Divider key={i.id + "_divider"} prev={prev} next={i} />,
-                  <Block.ToolCall key={i.id} active={idx === blocks.length - 1} block={i} />,
-                ];
-              default:
-                return null;
-            }
-          })}
+        {blocks.map((b, idx) => {
+          const p = idx === 0 ? null : blocks[idx - 1] ?? null;
+          const isActive = streaming && idx === blocks.length - 1;
+          let child: React.ReactNode = null;
+          switch (b.type) {
+            case "thinking":
+              child = <Block.Thinking block={b} />;
+              break;
+            case "text":
+              child = <Block.Text block={b} />;
+              break;
+            case "tool_call":
+              child = <Block.ToolCall block={b} />;
+              break;
+            default:
+              return [];
+          }
+          return (
+            <React.Fragment key={b.id}>
+              <Divider prev={p} next={b} />
+              <BlockProvider isActive={isActive}>{child}</BlockProvider>
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );

@@ -36,7 +36,7 @@ func main() {
 				juttele.WithDisplayName("Claude 3.7 Sonnet (thinking)"),
 				juttele.WithMaxTokens(16384),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
-				juttele.WithTemperature(0.7),
+				juttele.WithTemperature(1.0),
 			),
 		),
 		juttele.WithModel(
@@ -50,6 +50,14 @@ func main() {
 		juttele.WithModel(
 			juttele.NewOpenRouterModel(openRouterToken, "openai/gpt-4o-2024-11-20",
 				juttele.WithDisplayName("GPT-4o"),
+				juttele.WithMaxTokens(16384),
+				juttele.WithPersonality("Raw", rawSystemPrompt),
+				juttele.WithTemperature(0.7),
+			),
+		),
+		juttele.WithModel(
+			juttele.NewOpenRouterModel(openRouterToken, "openai/o3-mini-high",
+				juttele.WithDisplayName("o3-mini (high)"),
 				juttele.WithMaxTokens(16384),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
 				juttele.WithTemperature(0.7),

@@ -20,16 +20,14 @@
   align-items: center;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+  box-shadow: 0 0 0 0 transparent;
   display: flex;
   gap: 4px;
   max-width: 67%;
   overflow: hidden;
-  padding-block: 5px;
+  padding-block: 4px;
   padding-inline: 6px 12px;
   transition: background 200ms linear, box-shadow 200ms linear, border 200ms linear;
-}
-.root:not(:where([data-active])) .block {
-  box-shadow: 0 0 0 0 transparent;
 }
 .root:where([data-active]) .block {
   box-shadow: 0 0 16px 0 color-mix(in srgb, var(--color-accent) 12%, transparent);
@@ -38,9 +36,10 @@
   color: color-mix(in srgb, var(--color-text) 50%, var(--color-accent));
   display: block;
   flex-shrink: 0;
-  opacity: 0.4;
+  opacity: 0.33;
 }
 .block > span {
+  color: var(--color-text);
   display: block;
   font-family: "JetBrains Mono", monospace;
   font-size: 14px;
@@ -48,7 +47,11 @@
   overflow: hidden;
   padding-block-start: 0.5px;
   text-overflow: ellipsis;
+  transition: color 200ms linear;
   white-space: nowrap;
+}
+.root:where(:not([data-active])) .block > span {
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
 }
 .copy {
   align-items: center;
@@ -56,16 +59,16 @@
   aspect-ratio: 1 / 1;
   border-radius: 0px;
   border: none;
-  color: color-mix(in srgb, var(--color-text) 33%, var(--color-accent));
+  color: color-mix(in srgb, var(--color-text) 25%, transparent);
   display: flex;
   flex-shrink: 0;
   height: 28px;
   justify-content: center;
-  margin-inline-start: 4px;
+  margin-inline-start: 2px;
   outline: none;
   padding: 0px;
   transition: color 90ms linear;
 }
 .copy:hover {
-  color: var(--color-text);
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
 }
