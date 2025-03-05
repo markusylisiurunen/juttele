@@ -1,0 +1,27 @@
+.button {
+  --size: 32px;
+}
+.button {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-soft);
+  color: color-mix(in srgb, var(--color-text) 67%, transparent);
+  flex: 0 0 auto;
+  height: var(--size);
+  justify-content: center;
+  transition: border 90ms linear, color 90ms linear;
+  width: var(--size);
+}
+.button:hover {
+  border-color: color-mix(in srgb, var(--color-border-soft), var(--color-text) 4%);
+  color: var(--color-text);
+}
+.faded {
+  border: none;
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+}
+.faded:hover {
+  color: color-mix(in srgb, var(--color-text) 67%, transparent);
+}

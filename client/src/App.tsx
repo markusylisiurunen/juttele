@@ -1,114 +1,15 @@
 import "./styles/globals.css";
 
-import { CheckIcon, CopyIcon, RefreshCcwIcon, Rows3Icon, SquarePenIcon } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { API, ConfigResponse, DataResponse } from "./api";
 import { AnyBlock } from "./blocks";
-import { ChatHistory, MessageBox } from "./components";
+import { ChatHistory, Header, MessageBox } from "./components";
 import { makeListFilesTool, makeReadFileTool, makeWriteFileTool } from "./tools";
 import { assertNever, atom, Atom, streamCompletion, useAtomWithSelector } from "./utils";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const API_KEY = import.meta.env.VITE_API_KEY;
 const FS_BASE_DIR = import.meta.env.VITE_FS_BASE_DIR;
-
-//---
-
-type AppHeaderProps = {
-  chatTitle: string;
-  onChatsClick: () => void;
-  onRenameChatClick: () => void;
-  onCopyChatClick: () => void;
-  onNewChatClick: () => void;
-};
-const AppHeader: React.FC<AppHeaderProps> = ({
-  chatTitle,
-  onChatsClick,
-  onRenameChatClick,
-  onCopyChatClick,
-  onNewChatClick,
-}) => {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timeout = setTimeout(() => setCopied(false), 500);
-    return () => clearTimeout(timeout);
-  }, [copied]);
-  const BLUR_SEGMENTS = 8;
-  return (
-    <div className="app-header">
-      <div className="blur">
-        {Array.from({ length: BLUR_SEGMENTS }).map((_, i) => {
-          const MIN_BLUR = 0;
-          const MAX_BLUR = 24;
-          const blur = MIN_BLUR + (MAX_BLUR - MIN_BLUR) * (1 - i / (BLUR_SEGMENTS - 1));
-          let gradCenter = (i / (BLUR_SEGMENTS - 1)) * 100;
-          gradCenter *= 1 - 0.33;
-          const d = 20;
-          const grad1 = Math.max(0, gradCenter - 2 * d);
-          const grad2 = Math.max(0, gradCenter - 1 * d);
-          const grad3 = Math.min(100, gradCenter + 1 * d);
-          const grad4 = Math.min(100, gradCenter + 2 * d);
-          return (
-            <div
-              key={i}
-              style={{
-                backdropFilter: `blur(${blur}px)`,
-                zIndex: 1,
-                mask: `linear-gradient(${[
-                  "to bottom",
-                  `rgba(0,0,0,0) ${grad1}%`,
-                  `rgba(0,0,0,1) ${grad2}%`,
-                  `rgba(0,0,0,1) ${grad3}%`,
-                  `rgba(0,0,0,0) ${grad4}%`,
-                ].join(", ")})`,
-              }}
-            />
-          );
-        })}
-        {/* make sure the blur doesn't bleed from the top */}
-        <div
-          style={{
-            background: "linear-gradient(to bottom, var(--color-bg) 0%, transparent 33%)",
-            zIndex: 99,
-          }}
-        />
-      </div>
-      <div style={{ overflow: "hidden" }}>
-        <button onClick={onChatsClick}>
-          <Rows3Icon size={16} />
-        </button>
-        <span
-          style={{
-            flexShrink: 1,
-            maxWidth: "50vw",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {chatTitle}
-        </span>
-        <button className="rename" onClick={onRenameChatClick}>
-          <RefreshCcwIcon size={16} />
-        </button>
-      </div>
-      <div style={{ flexShrink: 0 }}>
-        <button
-          onClick={() => {
-            onCopyChatClick();
-            setCopied(true);
-          }}
-        >
-          {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
-        </button>
-        <button onClick={onNewChatClick}>
-          <SquarePenIcon size={16} />
-        </button>
-      </div>
-    </div>
-  );
-};
 
 type AppProps = {
   api: API;
@@ -120,7 +21,6 @@ type AppProps = {
 };
 const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChats, onReset }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [title, setTitle] = useState("");
   const [model, setModel] = useState<{ modelId: string; personalityId: string }>();
   const [blocks, setBlocks] = useState([] as AnyBlock[]);
   const [streaming, setStreaming] = useState(false);
@@ -128,7 +28,6 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
     const data = dataAtom.get();
     const chat = data.chats.find((chat) => chat.id === chatId);
     if (!chat) return;
-    setTitle(chat.title);
     const blocks = [] as AnyBlock[];
     for (const item of chat.history) {
       if (item.kind === "message" && item.data.role === "user") {
@@ -228,7 +127,6 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
       await api.rpc("rename_chat", { id: chatId, model_id: model.modelId });
       const data = await api.getData();
       dataAtom.set(data);
-      setTitle(data.chats.find((chat) => chat.id === chatId)?.title ?? "");
     });
   }
   function onCopyChatClick() {
@@ -247,15 +145,16 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
     setModel({ modelId, personalityId });
   }
   return (
-    <>
-      <AppHeader
-        chatTitle={title}
-        onChatsClick={onGoToChats}
-        onRenameChatClick={onRenameChatClick}
-        onCopyChatClick={onCopyChatClick}
-        onNewChatClick={onReset}
+    <div className="wrapper">
+      <Header
+        dataAtom={dataAtom}
+        chatId={chatId}
+        onCopyChat={onCopyChatClick}
+        onNewChat={onReset}
+        onRenameChat={onRenameChatClick}
+        onShowChats={onGoToChats}
       />
-      <div className="app-container">
+      <div className="content">
         <ChatHistory blocks={blocks} scrollRef={scrollRef} streaming={streaming} />
         <MessageBox
           configAtom={configAtom}
@@ -264,7 +163,7 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
           onControlModelChange={onControlModelChange}
         />
       </div>
-    </>
+    </div>
   );
 };
 
@@ -336,7 +235,7 @@ const AppWrapper: React.FC = () => {
     void init();
     return null;
   }
-  const devModeIndicator = BASE_URL.includes("localhost") ? (
+  const devModeIndicator = BASE_URL.includes("aa") ? (
     <div
       style={{
         background: "yellow",

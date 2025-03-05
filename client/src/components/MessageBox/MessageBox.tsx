@@ -1,10 +1,10 @@
 import { listen } from "@tauri-apps/api/event";
 import { load, Store } from "@tauri-apps/plugin-store";
-import { WrenchIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { ConfigResponse } from "../../api";
 import { useMount } from "../../hooks";
 import { Atom, useAtomWithSelector } from "../../utils";
+import { Button } from "../Button/Button";
 import styles from "./MessageBox.module.css";
 
 type MessageBoxProps = {
@@ -98,12 +98,9 @@ const MessageBox: React.FC<MessageBoxProps> = ({
       </div>
       <div className={styles.footer}>
         <div>
-          <button data-active={tools ? "" : undefined} onClick={() => setTools((t) => !t)}>
-            <WrenchIcon size={14} />
-            <span>Tools</span>
-          </button>
-          <button onClick={onModelChangeClick}>{model?.name}</button>
-          <button onClick={onPersonalityChangeClick}>{personality?.name}</button>
+          <Button glowing={tools} icon="wrench" label="Tools" onClick={() => setTools(!tools)} />
+          <Button label={model?.name ?? ""} onClick={onModelChangeClick} />
+          <Button label={personality?.name ?? ""} onClick={onPersonalityChangeClick} />
         </div>
         <div>{streaming ? <span className={styles.responding}>Responding...</span> : null}</div>
       </div>

@@ -30,90 +30,21 @@ button {
   padding: 0px;
 }
 
-.app-header {
-  align-items: center;
-  display: flex;
-  gap: 40px;
-  height: 64px;
-  justify-content: space-between;
-  left: 50%;
-  max-width: var(--max-width);
-  padding-inline: var(--spacing-padding-x);
-  position: fixed;
-  top: 0px;
-  transform: translateX(-50%);
+.wrapper {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
   width: 100vw;
-  z-index: 999;
 }
-.app-header .blur {
-  bottom: auto;
-  height: 110%;
-  left: 0px;
-  position: absolute;
-  right: var(--spacing-padding-x);
-  top: 0px;
-  z-index: 1;
-
-  --gradient-1: color-mix(in srgb, var(--color-bg) 100%, transparent);
-  --gradient-2: color-mix(in srgb, var(--color-bg) 67%, transparent);
-  --gradient-3: color-mix(in srgb, var(--color-bg) 0%, transparent);
-  background: linear-gradient(
-    to bottom,
-    var(--gradient-1) 10%,
-    var(--gradient-2) 50%,
-    var(--gradient-3) 97%
-  );
-}
-.app-header .blur > div {
-  inset: 0px;
-  position: absolute;
-}
-.app-header > :not(.blur) {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-  position: relative;
-  z-index: 2;
-  /* shifts the content a bit to the top */
-  padding-block-end: 8px;
-}
-.app-header button {
-  --color-accent: hsl(284, 0%, 25%);
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--color-accent) 20%, transparent),
-    color-mix(in srgb, var(--color-accent) 6%, transparent)
-  );
-
-  align-items: center;
-  appearance: none;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
-  color: var(--color-text);
-  height: 32px;
-  justify-content: center;
-  transition: border 90ms linear, color 90ms linear;
-  width: 32px;
-}
-.app-header button:hover {
-  border-color: color-mix(in srgb, var(--color-accent) 67%, transparent);
-}
-.app-header button.rename {
-  background: transparent;
-  border: none;
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
-}
-.app-header button:last-child:hover {
-  color: var(--color-text);
-}
-.app-container {
+.content {
   display: flex;
   flex-direction: column;
-  height: 100vh;
   margin-block: 0px;
   margin-inline: auto;
   max-width: var(--max-width);
+  overflow: hidden;
   padding: 0px;
+  width: 100%;
 }
 
 .chat-list {

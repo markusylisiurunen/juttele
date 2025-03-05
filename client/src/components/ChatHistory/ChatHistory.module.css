@@ -6,6 +6,6 @@
 }
 .history {
   overflow-y: auto;
-  padding-block-end: 64px;
-  padding-block-start: calc(64px + 8px);
+  padding-block-end: calc(6 * var(--spacing-padding-x));
+  padding-block-start: var(--spacing-padding-x);
 }

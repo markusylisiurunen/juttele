@@ -1,0 +1,30 @@
+.root {
+  align-items: stretch;
+  border-bottom: 1px solid var(--color-border-soft);
+  display: flex;
+  gap: 32px;
+  justify-content: space-between;
+  padding-block: 8px;
+  padding-inline: var(--spacing-padding-x);
+}
+.root > div {
+  align-items: center;
+  display: flex;
+  overflow: hidden;
+  &:nth-child(1) {
+    flex: 1 1 auto;
+    gap: 0px;
+  }
+  &:nth-child(2) {
+    flex: 0 0 auto;
+    gap: 4px;
+  }
+}
+.root span {
+  display: inline-block;
+  flex: 0 1 auto;
+  margin-inline: 8px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
