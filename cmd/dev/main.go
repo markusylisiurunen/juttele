@@ -48,7 +48,7 @@ func main() {
 			),
 		),
 		juttele.WithModel(
-			juttele.NewOpenRouterModel(openRouterToken, "openai/gpt-4o-2024-11-20",
+			juttele.NewOpenRouterModel(openRouterToken, "openai/gpt-4o-2024-11-20", nil,
 				juttele.WithDisplayName("GPT-4o"),
 				juttele.WithMaxTokens(16384),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
@@ -56,7 +56,7 @@ func main() {
 			),
 		),
 		juttele.WithModel(
-			juttele.NewOpenRouterModel(openRouterToken, "openai/o3-mini-high",
+			juttele.NewOpenRouterModel(openRouterToken, "openai/o3-mini-high", nil,
 				juttele.WithDisplayName("o3-mini (high)"),
 				juttele.WithMaxTokens(16384),
 				juttele.WithPersonality("Raw", rawSystemPrompt),

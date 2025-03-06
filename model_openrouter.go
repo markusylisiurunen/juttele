@@ -21,13 +21,15 @@ type openRouterModel struct {
 	id        string
 	apiKey    string
 	modelName string
+	providers []string
 }
 
-func NewOpenRouterModel(apiKey string, modelName string, opts ...modelOption) *openRouterModel {
+func NewOpenRouterModel(apiKey string, modelName string, providers []string, opts ...modelOption) *openRouterModel {
 	m := &openRouterModel{
 		model:     &model{displayName: modelName},
 		apiKey:    apiKey,
 		modelName: modelName,
+		providers: providers,
 	}
 	for _, opt := range opts {
 		opt(m.model)
@@ -95,14 +97,19 @@ func (m *openRouterModel) request(
 		Type     string          `json:"type"`
 		Function json.RawMessage `json:"function"`
 	}
+	type reqProvider struct {
+		AllowFallbacks bool     `json:"allow_fallbacks"`
+		Order          []string `json:"order"`
+	}
 	type reqBody struct {
-		IncludeReasoning bool      `json:"include_reasoning"`
-		MaxTokens        int64     `json:"max_tokens,omitempty"`
-		Messages         []any     `json:"messages"`
-		Model            string    `json:"model"`
-		Stream           bool      `json:"stream"`
-		Temperature      float64   `json:"temperature"`
-		Tools            []reqTool `json:"tools,omitempty"`
+		IncludeReasoning bool         `json:"include_reasoning"`
+		MaxTokens        int64        `json:"max_tokens,omitempty"`
+		Messages         []any        `json:"messages"`
+		Model            string       `json:"model"`
+		Provider         *reqProvider `json:"provider,omitempty"`
+		Stream           bool         `json:"stream"`
+		Temperature      float64      `json:"temperature"`
+		Tools            []reqTool    `json:"tools,omitempty"`
 	}
 	b := reqBody{
 		IncludeReasoning: true,
@@ -111,6 +118,13 @@ func (m *openRouterModel) request(
 		Model:            m.modelName,
 		Stream:           true,
 		Temperature:      m.temperature,
+	}
+	// populate the providers
+	if len(m.providers) > 0 {
+		b.Provider = &reqProvider{
+			AllowFallbacks: false,
+			Order:          m.providers,
+		}
 	}
 	// populate the tools
 	if opts.UseTools {
