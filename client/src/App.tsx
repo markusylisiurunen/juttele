@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { API, ConfigResponse, DataResponse } from "./api";
 import { AnyBlock } from "./blocks";
 import { ChatHistory, Header, MessageBox } from "./components";
+import { useMount } from "./hooks";
 import { makeListFilesTool, makeReadFileTool, makeWriteFileTool } from "./tools";
 import { assertNever, atom, Atom, streamCompletion, useAtomWithSelector } from "./utils";
 
@@ -213,26 +214,21 @@ const AppWrapper: React.FC = () => {
     if (configAtom) configAtom.set(config);
     if (dataAtom) dataAtom.set(data);
   }
-  const _init = useRef(false);
   async function init() {
-    if (_init.current) return;
-    _init.current = true;
-    try {
-      const [chat] = await Promise.all([
-        api.rpc("create_chat", {
-          title: `Chat ${new Date().toLocaleString()}`,
-        }) as Promise<{ chat_id: number }>,
-      ]);
-      const [config, data] = await Promise.all([api.getConfig(), api.getData()]);
-      setConfigAtom(atom(config));
-      setDataAtom(atom(data));
-      setChatId(chat.chat_id);
-    } finally {
-      _init.current = false;
-    }
+    const [chat] = await Promise.all([
+      api.rpc("create_chat", {
+        title: `Chat ${new Date().toLocaleString()}`,
+      }) as Promise<{ chat_id: number }>,
+    ]);
+    const [config, data] = await Promise.all([api.getConfig(), api.getData()]);
+    setConfigAtom(atom(config));
+    setDataAtom(atom(data));
+    setChatId(chat.chat_id);
   }
-  if (!configAtom || !dataAtom || !chatId) {
+  useMount(() => {
     void init();
+  });
+  if (!configAtom || !dataAtom || !chatId) {
     return null;
   }
   const devModeIndicator = BASE_URL.includes("aa") ? (

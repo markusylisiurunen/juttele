@@ -25,7 +25,7 @@ func main() {
 	app := juttele.New("YOUR_TOKEN_HERE",
 		juttele.WithModel(
 			juttele.NewAnthropicModel(anthropicToken, "claude-3-7-sonnet-20250219", false,
-				juttele.WithDisplayName("Claude 3.7 Sonnet (standard)"),
+				juttele.WithDisplayName("Claude 3.7 Sonnet"),
 				juttele.WithMaxTokens(16384),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
 				juttele.WithTemperature(0.7),
@@ -37,6 +37,14 @@ func main() {
 				juttele.WithMaxTokens(16384),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
 				juttele.WithTemperature(1.0),
+			),
+		),
+		juttele.WithModel(
+			juttele.NewAnthropicModel(anthropicToken, "claude-3-5-sonnet-20241022", false,
+				juttele.WithDisplayName("Claude 3.5 Sonnet"),
+				juttele.WithMaxTokens(8192),
+				juttele.WithPersonality("Raw", rawSystemPrompt),
+				juttele.WithTemperature(0.7),
 			),
 		),
 		juttele.WithModel(
