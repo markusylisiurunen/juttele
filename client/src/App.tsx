@@ -1,39 +1,37 @@
 import "./styles/globals.css";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { API, ConfigResponse, DataResponse } from "./api";
+import React, { useEffect, useRef, useState } from "react";
 import { AnyBlock } from "./blocks";
 import { ChatHistory, Header, MessageBox } from "./components";
-import { useMount } from "./hooks";
+import { AppProvider } from "./contexts";
+import { useApp, useMount } from "./hooks";
 import { makeListFilesTool, makeReadFileTool, makeWriteFileTool } from "./tools";
-import { assertNever, atom, Atom, streamCompletion, useAtomWithSelector } from "./utils";
+import { assertNever, streamCompletion, useAtomWithSelector } from "./utils";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const API_KEY = import.meta.env.VITE_API_KEY;
 const FS_BASE_DIR = import.meta.env.VITE_FS_BASE_DIR;
 
 type AppProps = {
-  api: API;
-  configAtom: Atom<ConfigResponse>;
-  dataAtom: Atom<DataResponse>;
   chatId: number;
   onGoToChats: () => void;
   onReset: () => void;
 };
-const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChats, onReset }) => {
+const App: React.FC<AppProps> = ({ chatId, onGoToChats, onReset }) => {
+  const app = useApp();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [model, setModel] = useState<{ modelId: string; personalityId: string }>();
   const [blocks, setBlocks] = useState([] as AnyBlock[]);
   const [streaming, setStreaming] = useState(false);
   useEffect(() => {
-    const data = dataAtom.get();
+    const data = app.data.get();
     const chat = data.chats.find((chat) => chat.id === chatId);
     if (!chat) return;
     const blocks = [] as AnyBlock[];
     for (const item of chat.history) {
       if (item.kind === "message" && item.data.role === "user") {
         blocks.push({
-          id: Date.now().toString() + "_" + blocks.length,
+          id: item.id,
           type: "text",
           role: "user",
           content: item.data.content,
@@ -41,7 +39,7 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
       }
       if (item.kind === "message" && item.data.role === "assistant") {
         blocks.push({
-          id: Date.now().toString() + "_" + blocks.length,
+          id: item.id,
           type: "text",
           role: "assistant",
           content: item.data.content,
@@ -49,7 +47,7 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
         if (item.data.tool_calls && item.data.tool_calls.length > 0) {
           for (const t of item.data.tool_calls) {
             blocks.push({
-              id: Date.now().toString() + "_" + blocks.length,
+              id: item.id,
               type: "tool_call",
               name: t.function.name,
               args: t.function.arguments,
@@ -59,7 +57,7 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
       }
       if (item.kind === "reasoning") {
         blocks.push({
-          id: Date.now().toString() + "_" + blocks.length,
+          id: item.id,
           type: "thinking",
           content: item.data.content,
         });
@@ -125,9 +123,9 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
   function onRenameChatClick() {
     void Promise.resolve().then(async () => {
       if (!model) return;
-      await api.rpc("rename_chat", { id: chatId, model_id: model.modelId });
-      const data = await api.getData();
-      dataAtom.set(data);
+      await app.api.rpc("rename_chat", { id: chatId, model_id: model.modelId });
+      const data = await app.api.getData();
+      app.data.set(data);
     });
   }
   function onCopyChatClick() {
@@ -148,7 +146,6 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
   return (
     <div className="wrapper">
       <Header
-        dataAtom={dataAtom}
         chatId={chatId}
         onCopyChat={onCopyChatClick}
         onNewChat={onReset}
@@ -158,7 +155,6 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
       <div className="content">
         <ChatHistory blocks={blocks} scrollRef={scrollRef} streaming={streaming} />
         <MessageBox
-          configAtom={configAtom}
           streaming={streaming}
           onMessage={(content, opts) => onMessage(content, { tools: opts?.tools ?? false })}
           onControlModelChange={onControlModelChange}
@@ -171,11 +167,11 @@ const App: React.FC<AppProps> = ({ api, configAtom, dataAtom, chatId, onGoToChat
 //---
 
 type ChatListProps = {
-  dataAtom: Atom<DataResponse>;
   onGoToApp: (chatId?: number) => void;
 };
-const ChatList: React.FC<ChatListProps> = ({ dataAtom, onGoToApp }) => {
-  const chats = useAtomWithSelector(dataAtom, (data) => {
+const ChatList: React.FC<ChatListProps> = ({ onGoToApp }) => {
+  const app = useApp();
+  const chats = useAtomWithSelector(app.data, (data) => {
     const sortedChats = data.chats.toSorted((a, b) => {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
@@ -200,9 +196,7 @@ const ChatList: React.FC<ChatListProps> = ({ dataAtom, onGoToApp }) => {
 //---
 
 const AppWrapper: React.FC = () => {
-  const api = useMemo(() => new API(BASE_URL, API_KEY), []);
-  const [configAtom, setConfigAtom] = useState<Atom<ConfigResponse>>();
-  const [dataAtom, setDataAtom] = useState<Atom<DataResponse>>();
+  const app = useApp();
   const [chatId, setChatId] = useState<number>();
   const [route, setRoute] = useState<"app" | "chatList">("app");
   function navigateTo(target: typeof route) {
@@ -210,25 +204,22 @@ const AppWrapper: React.FC = () => {
     void refresh();
   }
   async function refresh() {
-    const [config, data] = await Promise.all([api.getConfig(), api.getData()]);
-    if (configAtom) configAtom.set(config);
-    if (dataAtom) dataAtom.set(data);
+    // const [config, data] = await Promise.all([api.getConfig(), api.getData()]);
+    // if (configAtom) configAtom.set(config);
+    // if (dataAtom) dataAtom.set(data);
   }
   async function init() {
     const [chat] = await Promise.all([
-      api.rpc("create_chat", {
+      app.api.rpc("create_chat", {
         title: `Chat ${new Date().toLocaleString()}`,
       }) as Promise<{ chat_id: number }>,
     ]);
-    const [config, data] = await Promise.all([api.getConfig(), api.getData()]);
-    setConfigAtom(atom(config));
-    setDataAtom(atom(data));
     setChatId(chat.chat_id);
   }
   useMount(() => {
     void init();
   });
-  if (!configAtom || !dataAtom || !chatId) {
+  if (!chatId) {
     return null;
   }
   const devModeIndicator = BASE_URL.includes("aa") ? (
@@ -249,14 +240,11 @@ const AppWrapper: React.FC = () => {
       return (
         <>
           <App
-            api={api}
-            configAtom={configAtom}
-            dataAtom={dataAtom}
             chatId={chatId}
             onGoToChats={() => navigateTo("chatList")}
             onReset={() => {
-              setConfigAtom(undefined);
-              setDataAtom(undefined);
+              // setConfigAtom(undefined);
+              // setDataAtom(undefined);
               setChatId(undefined);
               setRoute("app");
             }}
@@ -267,7 +255,6 @@ const AppWrapper: React.FC = () => {
     case "chatList":
       return (
         <ChatList
-          dataAtom={dataAtom}
           onGoToApp={(chatId) => {
             if (chatId) setChatId(chatId);
             navigateTo("app");
@@ -279,4 +266,10 @@ const AppWrapper: React.FC = () => {
   }
 };
 
-export default AppWrapper;
+export default () => {
+  return (
+    <AppProvider>
+      <AppWrapper />
+    </AppProvider>
+  );
+};

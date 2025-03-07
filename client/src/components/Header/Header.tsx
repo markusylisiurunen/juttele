@@ -1,11 +1,10 @@
 import React from "react";
-import { DataResponse } from "../../api";
-import { Atom, useAtomWithSelector } from "../../utils";
+import { useApp } from "../../hooks";
+import { useAtomWithSelector } from "../../utils";
 import { IconButton } from "../IconButton/IconButton";
 import styles from "./Header.module.css";
 
 type HeaderProps = {
-  dataAtom: Atom<DataResponse>;
   chatId: number;
   onCopyChat: () => void;
   onNewChat: () => void;
@@ -13,15 +12,15 @@ type HeaderProps = {
   onShowChats: () => void;
 };
 const Header: React.FC<HeaderProps> = ({
-  dataAtom,
   chatId,
   onCopyChat,
   onNewChat,
   onRenameChat,
   onShowChats,
 }) => {
+  const app = useApp();
   const title = useAtomWithSelector(
-    dataAtom,
+    app.data,
     (data) => data.chats.find((chat) => chat.id === chatId)?.title
   );
   return (

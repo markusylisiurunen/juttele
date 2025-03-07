@@ -35,6 +35,8 @@ func (app *App) rpcRouteHandler(w http.ResponseWriter, r *http.Request) {
 		rpcResp, rpcErr = app.rpcCreateChat(ctx, v.Args)
 	case "rename_chat":
 		rpcResp, rpcErr = app.rpcRenameChat(ctx, v.Args)
+	case "delete_chat_event":
+		rpcResp, rpcErr = app.rpcDeleteChatEvent(ctx, v.Args)
 	default:
 		rpcErr = fmt.Errorf("unknown op: %q", v.Op)
 	}
@@ -171,6 +173,21 @@ Name: A conversation about the weather
 		Title: completion,
 	}); err != nil {
 		return nil, fmt.Errorf("error updating chat: %w", err)
+	}
+	type resp struct {
+		Ok bool `json:"ok"`
+	}
+	return json.Marshal(resp{Ok: true})
+}
+
+func (app *App) rpcDeleteChatEvent(ctx context.Context, args []byte) ([]byte, error) {
+	id := gjson.GetBytes(args, "id").String()
+	if id == "" {
+		return nil, fmt.Errorf("id is required")
+	}
+	err := app.repo.DeleteChatEvent(ctx, repo.DeleteChatEventArgs{ID: id})
+	if err != nil {
+		return nil, fmt.Errorf("error deleting chat event: %w", err)
 	}
 	type resp struct {
 		Ok bool `json:"ok"`

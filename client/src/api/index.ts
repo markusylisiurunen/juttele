@@ -25,6 +25,7 @@ const DataResponse = z.object({
       history: z.array(
         z.union([
           z.object({
+            id: z.string(),
             kind: z.literal("message"),
             data: z.object({
               role: z.union([z.literal("assistant"), z.literal("tool"), z.literal("user")]),
@@ -43,6 +44,7 @@ const DataResponse = z.object({
             }),
           }),
           z.object({
+            id: z.string(),
             kind: z.literal("reasoning"),
             data: z.object({
               content: z.string(),

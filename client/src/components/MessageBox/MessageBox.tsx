@@ -2,14 +2,13 @@ import { listen } from "@tauri-apps/api/event";
 import { load, Store } from "@tauri-apps/plugin-store";
 import React, { useEffect, useRef, useState } from "react";
 import { ConfigResponse } from "../../api";
-import { useMount } from "../../hooks";
-import { Atom, useAtomWithSelector } from "../../utils";
+import { useApp, useMount } from "../../hooks";
+import { useAtomWithSelector } from "../../utils";
 import { Button } from "../Button/Button";
 import styles from "./MessageBox.module.css";
 
 type MessageBoxProps = {
   store: Store;
-  configAtom: Atom<ConfigResponse>;
   defaultModel?: string;
   defaultPersonality?: string;
   streaming?: boolean;
@@ -18,19 +17,19 @@ type MessageBoxProps = {
 };
 const MessageBox: React.FC<MessageBoxProps> = ({
   store,
-  configAtom,
   defaultModel,
   defaultPersonality,
   streaming,
   onMessage,
   onControlModelChange,
 }) => {
+  const app = useApp();
   type Model = ConfigResponse["models"][number];
   type Personality = Model["personalities"][number];
   const [model, setModel] = useState<Model>();
   const [personality, setPersonality] = useState<Personality>();
   const [tools, setTools] = useState(false);
-  const options = useAtomWithSelector(configAtom, (config) => config.models);
+  const options = useAtomWithSelector(app.config, (config) => config.models);
   useEffect(() => {
     if (!model || !personality) return;
     onControlModelChange(model.id, personality.id);

@@ -1,10 +1,11 @@
-import { CopyIcon, RotateCwIcon } from "lucide-react";
+import { CopyIcon, TrashIcon } from "lucide-react";
 import React from "react";
 import Markdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { TextBlock } from "../../blocks";
+import { useApp } from "../../hooks";
 import { Pre } from "./Markdown/Pre";
 import { Table } from "./Markdown/Table";
 import styles from "./TextBlock.module.css";
@@ -19,8 +20,16 @@ type TextComponentProps = {
   block: TextBlock;
 };
 const TextComponent: React.FC<TextComponentProps> = ({ block }) => {
+  const app = useApp();
   function onCopy() {
     navigator.clipboard.writeText(block.content.trim() + "\n");
+  }
+  function onDelete() {
+    void Promise.resolve().then(async () => {
+      await app.api.rpc("delete_chat_event", { id: block.id });
+      const data = await app.api.getData();
+      app.data.set(data);
+    });
   }
   return (
     <div className={styles.root} data-block="text" data-role={block.role}>
@@ -33,13 +42,13 @@ const TextComponent: React.FC<TextComponentProps> = ({ block }) => {
           {preprocess(block.content)}
         </Markdown>
       </div>
-      {block.role === "assistant" ? (
+      {block.role === "assistant" || block.role === "user" ? (
         <div className={styles.actions}>
           <button onClick={onCopy}>
             <CopyIcon size={13} />
           </button>
-          <button>
-            <RotateCwIcon size={13} />
+          <button onClick={onDelete}>
+            <TrashIcon size={13} />
           </button>
           <span>
             {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}

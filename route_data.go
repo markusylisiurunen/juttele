@@ -29,6 +29,7 @@ type dataResponseHistoryItemReasoning struct {
 	Content string `json:"content"`
 }
 type dataResponseHistoryItem struct {
+	ID   string `json:"id"`
 	Kind string `json:"kind"`
 	Data any    `json:"data"`
 }
@@ -69,6 +70,7 @@ func (app *App) dataRouteHandler(w http.ResponseWriter, r *http.Request) {
 				reasoning := gjson.GetBytes(i.Content, "reasoning")
 				if reasoning.Exists() {
 					vi.History = append(vi.History, dataResponseHistoryItem{
+						ID:   i.UUID + "_reasoning",
 						Kind: "reasoning",
 						Data: dataResponseHistoryItemReasoning{
 							Content: reasoning.String(),
@@ -92,6 +94,7 @@ func (app *App) dataRouteHandler(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				vi.History = append(vi.History, dataResponseHistoryItem{
+					ID:   i.UUID,
 					Kind: "message",
 					Data: itemData,
 				})
