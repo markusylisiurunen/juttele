@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/markusylisiurunen/juttele/internal/logger"
 	"github.com/markusylisiurunen/juttele/internal/repo"
 	"github.com/tidwall/gjson"
 )
@@ -47,12 +48,14 @@ func (app *App) dataRouteHandler(w http.ResponseWriter, r *http.Request) {
 	v.Chats = make([]dataResponseChat, 0)
 	chats, err := app.repo.ListChats(ctx)
 	if err != nil {
+		logger.Get().Error(fmt.Sprintf("error listing chats: %v", err))
 		http.Error(w, fmt.Sprintf("error listing chats: %v", err), http.StatusInternalServerError)
 		return
 	}
 	for _, chat := range chats.Items {
 		events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{ChatID: chat.ID})
 		if err != nil {
+			logger.Get().Error(fmt.Sprintf("error listing chat events: %v", err))
 			http.Error(w, fmt.Sprintf("error listing chat events: %v", err), http.StatusInternalServerError)
 			return
 		}

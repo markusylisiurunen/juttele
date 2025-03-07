@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/markusylisiurunen/juttele/internal/logger"
 	"github.com/markusylisiurunen/juttele/internal/repo"
 	"github.com/markusylisiurunen/juttele/internal/util"
 	"github.com/tidwall/gjson"
@@ -21,6 +22,7 @@ func (app *App) rpcRouteHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var v rpcRequest
 	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+		logger.Get().Error(fmt.Sprintf("error decoding request: %v", err))
 		http.Error(w, fmt.Sprintf("error decoding request: %v", err), http.StatusBadRequest)
 		return
 	}
@@ -37,12 +39,14 @@ func (app *App) rpcRouteHandler(w http.ResponseWriter, r *http.Request) {
 		rpcErr = fmt.Errorf("unknown op: %q", v.Op)
 	}
 	if rpcErr != nil {
+		logger.Get().Error(fmt.Sprintf("error handling rpc request: %v", rpcErr))
 		http.Error(w, fmt.Sprintf("error handling rpc request: %v", rpcErr), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(rpcResp); err != nil {
+		logger.Get().Error(fmt.Sprintf("error writing response: %v", err))
 		http.Error(w, fmt.Sprintf("error writing response: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -150,7 +154,7 @@ Name: A conversation about the weather
 	var completion string
 	for i := range out {
 		if i.Err != nil {
-			fmt.Printf("error getting completion: %v", i.Err)
+			return nil, fmt.Errorf("error getting completion: %v", i.Err)
 		}
 		switch i := i.Val.(type) {
 		case *AssistantMessageChatEvent:

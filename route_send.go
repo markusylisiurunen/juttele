@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/markusylisiurunen/juttele/internal/logger"
 	"github.com/markusylisiurunen/juttele/internal/repo"
 	"github.com/markusylisiurunen/juttele/internal/util/jsonrpc"
 )
@@ -39,6 +40,7 @@ func writeWSError(proxy *webSocketProxy, message string, err error) {
 	if err != nil {
 		errMsg = fmt.Sprintf("%s: %v", message, err)
 	}
+	logger.Get().Error(errMsg)
 	resp := jsonrpc.NewNotification("error", map[string]any{"message": errMsg})
 	proxy.write(resp)
 }
@@ -47,11 +49,13 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	chatID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
+		logger.Get().Error(fmt.Sprintf("error parsing chat ID: %v", err))
 		http.Error(w, fmt.Sprintf("error parsing chat ID: %v", err), http.StatusBadRequest)
 		return
 	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		logger.Get().Error(fmt.Sprintf("error upgrading to websocket: %v", err))
 		http.Error(w, fmt.Sprintf("error upgrading to websocket: %v", err), http.StatusInternalServerError)
 		return
 	}

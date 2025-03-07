@@ -123,7 +123,13 @@ func (app *App) initRoutes(ctx context.Context) error {
 		{"GET /chats/{id}", app.sendRouteHandler},
 	}
 	for _, i := range mountables {
-		app.router.Handle(i.pattern, middleware.Auth(app.configToken)(i.handler))
+		app.router.Handle(i.pattern,
+			middleware.Log()(
+				middleware.Auth(app.configToken)(
+					i.handler,
+				),
+			),
+		)
 	}
 	return nil
 }

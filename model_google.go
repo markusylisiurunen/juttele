@@ -176,9 +176,14 @@ func (m *googleModel) request(
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		errorBody, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(errorBody))
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		if err := resp.Body.Close(); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, body)
 	}
 	return resp, nil
 }
