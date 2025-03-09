@@ -23,11 +23,14 @@ const Divider: React.FC<DividerProps> = ({ prev, next }) => {
       if (next.type === "thinking") return GAP_SM;
       return GAP_MD;
     }
-    if (prev.type === "tool_call") {
-      if (next.type === "tool_call") return GAP_SM;
+    if (prev.type === "tool") {
+      if (next.type === "tool") return GAP_SM;
       return GAP_MD;
     }
     if (prev.type === "text") {
+      return GAP_MD;
+    }
+    if (prev.type === "error" || next.type === "error") {
       return GAP_MD;
     }
     return 0;
@@ -59,8 +62,11 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ blocks, scrollRef, streaming 
             case "text":
               child = <Block.Text block={b} />;
               break;
-            case "tool_call":
-              child = <Block.ToolCall block={b} />;
+            case "tool":
+              child = <Block.Tool block={b} />;
+              break;
+            case "error":
+              child = <Block.Error block={b} />;
               break;
             default:
               return [];

@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/markusylisiurunen/juttele/internal/logger"
 	"github.com/markusylisiurunen/juttele/internal/repo"
+	"github.com/markusylisiurunen/juttele/internal/util"
 	"github.com/markusylisiurunen/juttele/internal/util/jsonrpc"
 )
 
@@ -95,34 +95,37 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		writeWSError(proxy, fmt.Sprintf("personality with ID %q not found", v.PersonalityID), nil)
 		return
 	}
-	events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{ChatID: chatID})
+	if err := app.upsertMessage(ctx, chatID, NewUserMessage(v.Content)); err != nil {
+		writeWSError(proxy, "error upserting user message", err)
+		return
+	}
+	if err := app.upsertBlock(ctx, chatID, NewTextBlock("user", v.Content)); err != nil {
+		writeWSError(proxy, "error upserting user block", err)
+		return
+	}
+	events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{
+		ChatID:     chatID,
+		KindPrefix: "message.",
+	})
 	if err != nil {
 		writeWSError(proxy, "error listing chat events", err)
 		return
 	}
-	history := make([]ChatEvent, 0, 1+len(events.Items))
+	history := make([]Message, 0, 1+len(events.Items))
+	history = append(history, NewSystemMessage(*systemPrompt))
 	for _, i := range events.Items {
-		if !strings.HasPrefix(i.Kind, "message.") {
-			continue
-		}
-		event, err := parseChatEvent(i.CreatedAt, i.UUID, i.Kind, i.Content)
+		message, err := parseMessage(i.Content)
 		if err != nil {
-			writeWSError(proxy, "error parsing chat event", err)
+			writeWSError(proxy, "error parsing message", err)
 			return
 		}
-		history = append(history, event)
+		history = append(history, message)
 	}
-	history = append(history, NewUserMessageChatEvent(v.Content))
-	if err := app.upsertChatEvent(ctx, chatID, NewUserMessageChatEvent(v.Content)); err != nil {
-		writeWSError(proxy, "error upserting chat event", err)
-		return
+	history = append(history, NewUserMessage(v.Content))
+	opts := GenerationConfig{
+		Tools: NewToolCatalog(),
 	}
-	opts := StreamCompletionOpts{
-		SystemPrompt: *systemPrompt,
-		Tools:        NewToolCatalog(),
-		UseTools:     v.UseTools,
-	}
-	if opts.UseTools {
+	if v.UseTools {
 		for _, j := range app.tools {
 			opts.Tools.Register(j)
 		}
@@ -131,69 +134,137 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out := model.StreamCompletion(r.Context(), history, opts)
-	for i := range out {
-		if i.Err != nil {
-			writeWSError(proxy, "error streaming completion", i.Err)
+	out2 := app.streamBlocks(ctx, chatID, out)
+	for i := range out2 {
+		msg := jsonrpc.NewNotification("block", i)
+		if err := proxy.write(msg); err != nil {
+			writeWSError(proxy, "error writing block message", err)
 			return
-		}
-		switch i := i.Val.(type) {
-		case *AssistantMessageChatEvent:
-			if err := app.upsertChatEvent(ctx, chatID, i); err != nil {
-				writeWSError(proxy, "error upserting chat event", err)
-				return
-			}
-			if len(i.reasoning) > 0 {
-				msg := jsonrpc.NewNotification("block", map[string]any{
-					"id":      i.uuid + "_thinking",
-					"type":    "thinking",
-					"content": i.reasoning,
-				})
-				if err := proxy.write(msg); err != nil {
-					writeWSError(proxy, "error writing block message", err)
-					return
-				}
-			}
-			if len(i.content) > 0 {
-				msg := jsonrpc.NewNotification("block", map[string]any{
-					"id":      i.uuid,
-					"type":    "text",
-					"role":    "assistant",
-					"content": i.content,
-				})
-				if err := proxy.write(msg); err != nil {
-					writeWSError(proxy, "error writing block message", err)
-					return
-				}
-			}
-			for _, i := range i.toolCalls {
-				msg := jsonrpc.NewNotification("block", map[string]any{
-					"id":   i.ID,
-					"type": "tool_call",
-					"name": i.FuncName,
-					"args": i.FuncArgs,
-				})
-				if err := proxy.write(msg); err != nil {
-					writeWSError(proxy, "error writing block message", err)
-					return
-				}
-			}
-			continue
-		case *ToolMessageChatEvent:
-			if err := app.upsertChatEvent(ctx, chatID, i); err != nil {
-				writeWSError(proxy, "error upserting chat event", err)
-				return
-			}
 		}
 	}
 }
 
-func (app *App) upsertChatEvent(ctx context.Context, id int64, event ChatEvent) error {
-	uuid, kind, content := event.getChatEvent()
+func (app *App) streamBlocks(ctx context.Context, chatID int64, in <-chan Result[Message]) <-chan Block {
+	begin := time.Now()
+	out1 := make(chan Block)
+	go func() {
+		defer close(out1)
+		var done bool
+		blocks := map[string]Block{}
+		toolBlocks := map[string]*ToolBlock{}
+		for i := range in {
+			if done {
+				continue
+			}
+			if i.Err != nil {
+				logger.Get().Error(fmt.Sprintf("error in stream: %v", i.Err))
+				done = true
+				out1 <- NewErrorBlock(-32603, i.Err.Error())
+			} else {
+				if err := app.upsertMessage(ctx, chatID, i.Val); err != nil {
+					logger.Get().Error(fmt.Sprintf("error upserting message: %v", err))
+					done = true
+					out1 <- NewErrorBlock(-32603, fmt.Sprintf("error upserting message: %v", err))
+					continue
+				}
+				switch i := i.Val.(type) {
+				case *AssistantMessage:
+					if i.Thinking != "" {
+						id := i.GetID() + "_thinking"
+						block, ok := blocks[id].(*ThinkingBlock)
+						if !ok {
+							block = NewThinkingBlock("", 0)
+							blocks[id] = block
+						}
+						block.Update(i.Thinking, int64(time.Since(begin).Milliseconds()))
+						out1 <- block
+					}
+					if i.Content != "" {
+						id := i.GetID()
+						block, ok := blocks[id].(*TextBlock)
+						if !ok {
+							block = NewTextBlock("assistant", "")
+							blocks[id] = block
+						}
+						block.Update(i.Content)
+						out1 <- block
+					}
+					if len(i.ToolCalls) > 0 {
+						for _, j := range i.ToolCalls {
+							id := i.GetID() + j.CallID
+							block, ok := blocks[id].(*ToolBlock)
+							if !ok {
+								block = NewToolBlock("", "")
+								blocks[id] = block
+								toolBlocks[j.CallID] = block
+							}
+							block.Update(j.FuncName, j.FuncArgs)
+							out1 <- block
+						}
+					}
+				case *ToolMessage:
+					id := i.CallID
+					block, ok := toolBlocks[id]
+					if !ok {
+						continue
+					}
+					if i.Error != nil {
+						block.SetError(i.Error.Code, i.Error.Message)
+						out1 <- block
+						continue
+					}
+					if i.Result != nil {
+						block.SetResult(*i.Result)
+						out1 <- block
+						continue
+					}
+				default:
+					logger.Get().Error(fmt.Sprintf("unknown message type: %T", i))
+					done = true
+					out1 <- NewErrorBlock(-32603, fmt.Sprintf("unknown message type: %T", i))
+				}
+			}
+		}
+	}()
+	out2 := make(chan Block)
+	go func() {
+		defer close(out2)
+		for i := range out1 {
+			if err := app.upsertBlock(ctx, chatID, i); err != nil {
+				logger.Get().Error(fmt.Sprintf("error upserting block: %v", err))
+			}
+			out2 <- i
+		}
+	}()
+	return out2
+}
+
+func (app *App) upsertMessage(ctx context.Context, chatID int64, message Message) error {
+	return app.upsertChatEvent(ctx,
+		chatID,
+		message.GetID(),
+		fmt.Sprintf("message.%s", message.GetType()),
+		util.Must(message.MarshalJSON()),
+	)
+}
+
+func (app *App) upsertBlock(ctx context.Context, chatID int64, block Block) error {
+	return app.upsertChatEvent(ctx,
+		chatID,
+		block.GetID(),
+		fmt.Sprintf("block.%s", block.GetType()),
+		util.Must(block.MarshalJSON()),
+	)
+}
+
+func (app *App) upsertChatEvent(
+	ctx context.Context, chatID int64, eventUUID string, eventKind string, eventContent []byte,
+) error {
 	if _, err := app.repo.CreateChatEvent(ctx, repo.CreateChatEventArgs{
-		ChatID:  id,
-		UUID:    uuid,
-		Kind:    kind,
-		Content: content,
+		ChatID:  chatID,
+		UUID:    eventUUID,
+		Kind:    eventKind,
+		Content: eventContent,
 	}); err != nil {
 		return err
 	}

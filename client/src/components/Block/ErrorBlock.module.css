@@ -1,0 +1,20 @@
+.root {
+  --color-accent: lch(56% 80 10);
+  align-items: center;
+  background: color-mix(in srgb, var(--color-accent) 2%, transparent);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 10%, transparent);
+  display: flex;
+  gap: 8px;
+  margin-inline: var(--spacing-padding-x);
+  padding-block: 6px;
+  padding-inline: 8px;
+}
+.root svg {
+  color: color-mix(in srgb, var(--color-accent) 75%, var(--color-text));
+  flex: 0 0 auto;
+}
+.root span {
+  color: color-mix(in srgb, var(--color-accent) 20%, var(--color-text));
+  flex: 1 1 auto;
+}

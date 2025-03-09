@@ -17,7 +17,7 @@ A chat represents a conversation session containing an ordered sequence of block
     {
       "id": "01957ac5-3560-7b19-b185-2ffbdd97f724",
       "ts": "2025-03-09T12:01:20.702Z",
-      "hash": 2426039091713404309,
+      "hash": "2426039091713404309",
       "type": "thinking",
       "content": "Okay, let me see...",
       "duration": 7467
@@ -25,7 +25,7 @@ A chat represents a conversation session containing an ordered sequence of block
     {
       "id": "01957ac5-5dce-718e-b7c7-af71a3dc78d9",
       "ts": "2025-03-09T12:01:29.001Z",
-      "hash": 6866007823030491827,
+      "hash": "6866007823030491827",
       "type": "text",
       "role": "assistant",
       "content": "Here is the answer to your question."
@@ -55,7 +55,7 @@ Represents the model's thought process, typically shown while generating a respo
 {
   "id": "01957ac5-3560-7b19-b185-2ffbdd97f724",
   "ts": "2025-03-09T12:00:00.000Z",
-  "hash": 2426039091713404309,
+  "hash": "2426039091713404309",
   "type": "thinking",
   "content": "Okay, let me see...",
   "duration": 7467
@@ -70,7 +70,7 @@ Contains message content with role attribution.
 {
   "id": "01957ac5-3560-7b19-b185-2ffbdd97f724",
   "ts": "2025-03-09T12:00:00.000Z",
-  "hash": 2426039091713404309,
+  "hash": "2426039091713404309",
   "type": "text",
   "role": "assistant",
   "content": "Here is the answer to your question."
@@ -87,7 +87,7 @@ Success example:
 {
   "id": "01957ac5-3560-7b19-b185-2ffbdd97f724",
   "ts": "2025-03-09T12:00:00.000Z",
-  "hash": 2426039091713404309,
+  "hash": "2426039091713404309",
   "type": "tool",
   "name": "calculator",
   "args": "{\"op\": \"*\", \"a\": 10, \"b\": 4.2}",
@@ -102,7 +102,7 @@ Error example:
 {
   "id": "01957ac5-3560-7b19-b185-2ffbdd97f724",
   "ts": "2025-03-09T12:00:00.000Z",
-  "hash": 2426039091713404309,
+  "hash": "2426039091713404309",
   "type": "tool",
   "name": "calculator",
   "args": "{\"op\": \"/\", \"a\": 10, \"b\": 0}",
@@ -122,7 +122,7 @@ Indicates an error in the chat session. The error field contains the error messa
 {
   "id": "01957ac5-3560-7b19-b185-2ffbdd97f724",
   "ts": "2025-03-09T12:00:00.000Z",
-  "hash": 2426039091713404309,
+  "hash": "2426039091713404309",
   "type": "error",
   "error": {
     "code": -32603,
@@ -164,7 +164,7 @@ As the server processes the request, it streams response blocks to the client us
   "params": {
     "id": "01957ac5-3560-7b19-b185-2ffbdd97f724",
     "ts": "2025-03-09T12:01:20.702Z",
-    "hash": 2426039091713404309,
+    "hash": "2426039091713404309",
     "type": "thinking",
     "content": "Okay, let me see...",
     "duration": 7467

@@ -1,16 +1,32 @@
 import "./styles/globals.css";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
+import { DataResponse } from "./api";
 import { AnyBlock } from "./blocks";
 import { ChatHistory, Header, MessageBox } from "./components";
 import { AppProvider } from "./contexts";
-import { useApp, useMount } from "./hooks";
+import { useApp, useDev, useMount } from "./hooks";
 import { makeListFilesTool, makeReadFileTool, makeWriteFileTool } from "./tools";
-import { assertNever, streamCompletion, useAtomWithSelector } from "./utils";
+import { assertNever, Atom, streamCompletion, useAtomWithSelector } from "./utils";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const API_KEY = import.meta.env.VITE_API_KEY;
 const FS_BASE_DIR = import.meta.env.VITE_FS_BASE_DIR;
+
+function upsertBlock(dataAtom: Atom<DataResponse>, chatId: number, block: AnyBlock) {
+  dataAtom.set((data) => {
+    return {
+      ...data,
+      chats: data.chats.map((chat) => {
+        if (chat.id !== chatId) return chat;
+        const blocks = chat.blocks;
+        const idx = blocks.findIndex((i) => i.id === block.id);
+        if (idx === -1) return { ...chat, blocks: [...blocks, block] };
+        return { ...chat, blocks: [...blocks.slice(0, idx), block, ...blocks.slice(idx + 1)] };
+      }),
+    };
+  });
+}
 
 type AppProps = {
   chatId: number;
@@ -19,60 +35,26 @@ type AppProps = {
 };
 const App: React.FC<AppProps> = ({ chatId, onGoToChats, onReset }) => {
   const app = useApp();
+  const dev = useDev();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [model, setModel] = useState<{ modelId: string; personalityId: string }>();
-  const [blocks, setBlocks] = useState([] as AnyBlock[]);
   const [streaming, setStreaming] = useState(false);
-  useEffect(() => {
-    const data = app.data.get();
+  const blocks = useAtomWithSelector(app.data, (data) => {
     const chat = data.chats.find((chat) => chat.id === chatId);
-    if (!chat) return;
-    const blocks = [] as AnyBlock[];
-    for (const item of chat.history) {
-      if (item.kind === "message" && item.data.role === "user") {
-        blocks.push({
-          id: item.id,
-          type: "text",
-          role: "user",
-          content: item.data.content,
-        });
-      }
-      if (item.kind === "message" && item.data.role === "assistant") {
-        blocks.push({
-          id: item.id,
-          type: "text",
-          role: "assistant",
-          content: item.data.content,
-        });
-        if (item.data.tool_calls && item.data.tool_calls.length > 0) {
-          for (const t of item.data.tool_calls) {
-            blocks.push({
-              id: item.id,
-              type: "tool_call",
-              name: t.function.name,
-              args: t.function.arguments,
-            });
-          }
-        }
-      }
-      if (item.kind === "reasoning") {
-        blocks.push({
-          id: item.id,
-          type: "thinking",
-          content: item.data.content,
-        });
-      }
-    }
-    setBlocks(blocks);
-  }, [chatId]);
+    if (!chat) return [];
+    return chat.blocks;
+  });
   function onMessage(content: string, opts: { tools: boolean }) {
     void Promise.resolve().then(async () => {
       if (!model) return;
-      // append the user message
-      setBlocks((blocks) => [
-        ...blocks,
-        { id: Date.now().toString(), type: "text", role: "user", content },
-      ]);
+      upsertBlock(app.data, chatId, {
+        id: Date.now().toString(),
+        ts: new Date().toISOString(),
+        hash: "",
+        type: "text",
+        role: "user",
+        content: content,
+      });
       requestAnimationFrame(() => {
         scrollRef.current?.scrollTo({ top: 1_000_000, behavior: "smooth" });
       });
@@ -94,27 +76,12 @@ const App: React.FC<AppProps> = ({ chatId, onGoToChats, onReset }) => {
           ],
           (msg) => {
             if (msg.method === "block") {
-              setBlocks((blocks) => {
-                const idx = blocks.findIndex((i) => i.id === msg.params.id);
-                if (idx === -1) return [...blocks, msg.params];
-                blocks[idx] = msg.params;
-                return [...blocks];
-              });
+              upsertBlock(app.data, chatId, msg.params);
             }
           }
         );
       } catch (error) {
         console.error(error);
-        const message = error instanceof Error ? error.message : "Something went wrong.";
-        setBlocks((blocks) => [
-          ...blocks,
-          {
-            id: Date.now().toString(),
-            type: "text",
-            role: "assistant",
-            content: `Error: ${message}`,
-          },
-        ]);
       } finally {
         setStreaming(false);
       }
@@ -160,6 +127,7 @@ const App: React.FC<AppProps> = ({ chatId, onGoToChats, onReset }) => {
           onControlModelChange={onControlModelChange}
         />
       </div>
+      {dev ? <div className="dev" /> : null}
     </div>
   );
 };
@@ -173,18 +141,18 @@ const ChatList: React.FC<ChatListProps> = ({ onGoToApp }) => {
   const app = useApp();
   const chats = useAtomWithSelector(app.data, (data) => {
     const sortedChats = data.chats.toSorted((a, b) => {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return new Date(b.ts).getTime() - new Date(a.ts).getTime();
     });
     return sortedChats.map((chat) => ({
       id: chat.id,
       title: chat.title,
-      message: chat.history.find((i) => i.kind === "message")?.data.content ?? null,
+      message: chat.blocks.find((i) => i.type === "text")?.content ?? null,
     }));
   });
   return (
     <div className="chat-list">
       {chats.map((chat) => (
-        <button onClick={() => onGoToApp(chat.id)}>
+        <button key={chat.id} onClick={() => onGoToApp(chat.id)}>
           <span>{chat.title}</span>
           <span>{chat.message ?? "No messages available"}</span>
         </button>

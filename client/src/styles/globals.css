@@ -19,6 +19,11 @@
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
 }
+.dev {
+  background: hotpink;
+  height: 4px;
+  width: 100vw;
+}
 button {
   align-items: center;
   appearance: none;

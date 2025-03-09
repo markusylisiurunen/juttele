@@ -12,43 +12,47 @@ import (
 )
 
 func streamWithTools(
-	ctx context.Context, tools *ToolCatalog, history *[]ChatEvent, request func() <-chan Result[ChatEvent],
-) <-chan Result[ChatEvent] {
-	out := make(chan Result[ChatEvent])
+	ctx context.Context, tools *ToolCatalog, history *[]Message, request func() <-chan Result[Message],
+) <-chan Result[Message] {
+	out := make(chan Result[Message])
 	go func() {
 		defer close(out)
 	llm:
-		var last *AssistantMessageChatEvent
+		var last *AssistantMessage
 		for event := range request() {
 			if event.Err != nil {
-				out <- Err[ChatEvent](event.Err)
+				out <- Err[Message](event.Err)
 				return
 			}
-			if v, ok := event.Val.(*AssistantMessageChatEvent); ok {
+			if v, ok := event.Val.(*AssistantMessage); ok {
 				last = v
 			}
 			out <- event
 		}
-		if last == nil || len(last.toolCalls) == 0 {
+		if last == nil || len(last.ToolCalls) == 0 {
 			return
 		}
 		*history = append(*history, last)
-		for _, t := range last.toolCalls {
+		for _, t := range last.ToolCalls {
 			result, err := tools.Call(ctx, t.FuncName, t.FuncArgs)
 			if err != nil {
-				out <- Err[ChatEvent](err)
-				return
+				msg := NewToolMessage(t.CallID)
+				msg.SetError(-32603, err.Error())
+				out <- Ok[Message](msg)
+				*history = append(*history, msg)
+			} else {
+				msg := NewToolMessage(t.CallID)
+				msg.SetResult(result)
+				out <- Ok[Message](msg)
+				*history = append(*history, msg)
 			}
-			tc := NewToolMessageChatEvent(t.ID, result)
-			out <- Ok[ChatEvent](tc)
-			*history = append(*history, tc)
 		}
 		goto llm
 	}()
 	return out
 }
 
-func streamOpenAI(resp *http.Response, forceThinking bool) <-chan Result[ChatEvent] {
+func streamOpenAI(resp *http.Response, forceThinking bool) <-chan Result[Message] {
 	type respToolCall struct {
 		Index    int64  `json:"index"`
 		ID       string `json:"id"`
@@ -68,19 +72,25 @@ func streamOpenAI(resp *http.Response, forceThinking bool) <-chan Result[ChatEve
 			} `json:"delta"`
 		} `json:"choices"`
 	}
-	out := make(chan Result[ChatEvent])
+	out := make(chan Result[Message])
 	go func() {
 		defer close(out)
 		events := streamSSE(resp)
-		msg := NewAssistantMessageChatEvent("")
+		msg := NewAssistantMessage("", "")
+
+		// Create a thinking block if needed
+		var thinkingContent string
 		if forceThinking {
-			msg.reasoning = "Thinking, just a second... "
+			thinkingContent = "Thinking, just a second... "
+			msg.SetMeta("thinking", thinkingContent)
 		}
-		out <- Ok[ChatEvent](msg)
+
+		out <- Ok[Message](msg)
 		toolBuffer := make([]*respToolCall, 64)
+
 		for event := range events {
 			if event.Err != nil {
-				out <- Err[ChatEvent](event.Err)
+				out <- Err[Message](event.Err)
 				return
 			}
 			if event.Val.T1 != "message" {
@@ -89,15 +99,19 @@ func streamOpenAI(resp *http.Response, forceThinking bool) <-chan Result[ChatEve
 			if string(event.Val.T2) == "[DONE]" {
 				break
 			}
+
 			var b respSchema
 			if err := json.Unmarshal(event.Val.T2, &b); err != nil {
-				out <- Err[ChatEvent](err)
+				out <- Err[Message](err)
 				return
 			}
 			if len(b.Choices) == 0 {
 				continue
 			}
+
 			delta := b.Choices[0].Delta
+
+			// Handle reasoning/thinking content
 			if !forceThinking && (delta.Reasoning != "" || delta.ReasoningContent != "") {
 				var reasoning string
 				for _, i := range []string{
@@ -108,16 +122,22 @@ func streamOpenAI(resp *http.Response, forceThinking bool) <-chan Result[ChatEve
 						reasoning = i
 					}
 				}
-				msg.reasoning += reasoning
-				out <- Ok[ChatEvent](msg)
+
+				thinkingContent += reasoning
+				msg.SetMeta("thinking", thinkingContent)
+				out <- Ok[Message](msg)
 			}
+
+			// Handle regular content
 			if delta.Content != "" {
-				msg.content += delta.Content
-				out <- Ok[ChatEvent](msg)
+				msg.Content += delta.Content
+				out <- Ok[Message](msg)
 			}
+
+			// Handle tool calls
 			for _, t := range delta.ToolCalls {
 				if len(toolBuffer) <= int(t.Index) {
-					out <- Err[ChatEvent](errors.New("tool call index out of range"))
+					out <- Err[Message](errors.New("tool call index out of range"))
 					return
 				}
 				if toolBuffer[t.Index] == nil {
@@ -131,26 +151,24 @@ func streamOpenAI(resp *http.Response, forceThinking bool) <-chan Result[ChatEve
 				}
 				toolBuffer[t.Index].Function.Args += t.Function.Args
 			}
+
 			if len(delta.ToolCalls) > 0 {
-				msg.toolCalls = nil
+				// Clear existing tool calls and regenerate them
+				msg.ToolCalls = nil
 				for _, t := range toolBuffer {
 					if t == nil || t.Type != "function" {
 						continue
 					}
-					msg.toolCalls = append(msg.toolCalls, AssistantMessageChatEventToolCall{
-						ID:       t.ID,
-						FuncName: t.Function.Name,
-						FuncArgs: t.Function.Args,
-					})
+					msg.AppendToolCall(t.ID, t.Function.Name, t.Function.Args)
 				}
-				out <- Ok[ChatEvent](msg)
+				out <- Ok[Message](msg)
 			}
 		}
 	}()
 	return out
 }
 
-func streamAnthropic(resp *http.Response) <-chan Result[ChatEvent] {
+func streamAnthropic(resp *http.Response) <-chan Result[Message] {
 	type respContentBlockStart struct {
 		Type         string `json:"type"`
 		Index        int    `json:"index"`
@@ -170,32 +188,36 @@ func streamAnthropic(resp *http.Response) <-chan Result[ChatEvent] {
 			PartialJSON string `json:"partial_json"`
 		} `json:"delta"`
 	}
-	out := make(chan Result[ChatEvent])
+	out := make(chan Result[Message])
 	go func() {
 		defer close(out)
 		events := streamSSE(resp)
-		msg := NewAssistantMessageChatEvent("")
-		out <- Ok[ChatEvent](msg)
+		msg := NewAssistantMessage("", "")
+		out <- Ok[Message](msg)
+
 		type toolBufferItem struct {
 			ID       string
 			FuncName string
 			FuncArgs string
 		}
 		toolBuffer := make([]*toolBufferItem, 64)
+		var thinkingContent string
+
 		for event := range events {
 			if event.Err != nil {
-				out <- Err[ChatEvent](event.Err)
+				out <- Err[Message](event.Err)
 				return
 			}
+
 			if event.Val.T1 == "content_block_start" {
 				var b respContentBlockStart
 				if err := json.Unmarshal([]byte(event.Val.T2), &b); err != nil {
-					out <- Err[ChatEvent](err)
+					out <- Err[Message](err)
 					return
 				}
 				if b.ContentBlock.Type == "tool_use" {
 					if len(toolBuffer) <= b.Index {
-						out <- Err[ChatEvent](errors.New("tool call index out of range"))
+						out <- Err[Message](errors.New("tool call index out of range"))
 						return
 					}
 					toolBuffer[b.Index] = &toolBufferItem{
@@ -203,64 +225,70 @@ func streamAnthropic(resp *http.Response) <-chan Result[ChatEvent] {
 						FuncName: b.ContentBlock.Name,
 						FuncArgs: "",
 					}
-					msg.toolCalls = nil
+
+					// Clear and rebuild tool calls
+					msg.ToolCalls = nil
 					for _, t := range toolBuffer {
 						if t == nil {
 							continue
 						}
-						msg.toolCalls = append(msg.toolCalls, AssistantMessageChatEventToolCall{
-							ID:       t.ID,
-							FuncName: t.FuncName,
-							FuncArgs: t.FuncArgs,
-						})
+						msg.AppendToolCall(t.ID, t.FuncName, t.FuncArgs)
 					}
-					out <- Ok[ChatEvent](msg)
+					out <- Ok[Message](msg)
 				}
 				continue
 			}
+
 			if event.Val.T1 == "content_block_delta" {
 				var b respContentBlockDelta
 				if err := json.Unmarshal([]byte(event.Val.T2), &b); err != nil {
-					out <- Err[ChatEvent](err)
+					out <- Err[Message](err)
 					return
 				}
+
+				// Handle thinking content
 				if b.Delta.Thinking != "" {
-					msg.reasoning += b.Delta.Thinking
-					out <- Ok[ChatEvent](msg)
+					thinkingContent += b.Delta.Thinking
+					msg.SetMeta("thinking", thinkingContent)
+					out <- Ok[Message](msg)
 				}
+
+				// Handle regular text content
 				if b.Delta.Text != "" {
-					msg.content += b.Delta.Text
-					out <- Ok[ChatEvent](msg)
+					msg.Content += b.Delta.Text
+					out <- Ok[Message](msg)
 				}
+
+				// Handle partial JSON for tool calls
 				if b.Delta.PartialJSON != "" {
 					if len(toolBuffer) <= b.Index {
-						out <- Err[ChatEvent](errors.New("tool call index out of range"))
+						out <- Err[Message](errors.New("tool call index out of range"))
 						return
 					}
 					toolBuffer[b.Index].FuncArgs += b.Delta.PartialJSON
-					msg.toolCalls = nil
+
+					// Clear and rebuild tool calls
+					msg.ToolCalls = nil
 					for _, t := range toolBuffer {
 						if t == nil {
 							continue
 						}
-						msg.toolCalls = append(msg.toolCalls, AssistantMessageChatEventToolCall{
-							ID:       t.ID,
-							FuncName: t.FuncName,
-							FuncArgs: t.FuncArgs,
-						})
+						msg.AppendToolCall(t.ID, t.FuncName, t.FuncArgs)
 					}
-					out <- Ok[ChatEvent](msg)
+					out <- Ok[Message](msg)
 				}
 				continue
 			}
 		}
-		if len(msg.toolCalls) > 0 {
-			for i := range msg.toolCalls {
-				if msg.toolCalls[i].FuncArgs == "" {
-					msg.toolCalls[i].FuncArgs = "{}"
+
+		// Ensure tool calls have valid args
+		if len(msg.ToolCalls) > 0 {
+			for i := range msg.ToolCalls {
+				if msg.ToolCalls[i].FuncArgs == "" {
+					msg.ToolCalls[i].FuncArgs = "{}"
 				}
 			}
-			out <- Ok[ChatEvent](msg)
+			out <- Ok[Message](msg)
 		}
 	}()
 	return out

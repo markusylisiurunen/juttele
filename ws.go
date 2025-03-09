@@ -13,6 +13,7 @@ import (
 )
 
 type webSocketProxy struct {
+	mu   sync.Mutex
 	conn *websocket.Conn
 
 	reqID atomic.Uint64
@@ -70,6 +71,8 @@ func (ws *webSocketProxy) readLoop() {
 }
 
 func (ws *webSocketProxy) write(v any) error {
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
 	ws.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	return ws.conn.WriteJSON(v)
 }
@@ -109,12 +112,14 @@ func (ws *webSocketProxy) rpc(
 func (ws *webSocketProxy) close() {
 	ws.closeOnce.Do(func() {
 		close(ws.closeChan)
+		ws.mu.Lock()
 		ws.conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 		ws.conn.WriteMessage(
 			websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
 		)
 		ws.conn.Close()
+		ws.mu.Unlock()
 		ws.pendingMu.Lock()
 		for id, ch := range ws.pending {
 			ch <- Err[json.RawMessage](fmt.Errorf("connection closed"))

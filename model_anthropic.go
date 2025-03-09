@@ -49,22 +49,22 @@ func (m *anthropicModel) GetModelInfo() ModelInfo {
 }
 
 func (m *anthropicModel) StreamCompletion(
-	ctx context.Context, history []ChatEvent, opts StreamCompletionOpts,
-) <-chan Result[ChatEvent] {
-	if opts.UseTools && m.extendedThinking {
-		out := make(chan Result[ChatEvent], 1)
+	ctx context.Context, history []Message, opts GenerationConfig,
+) <-chan Result[Message] {
+	if opts.Tools.Count() > 0 && m.extendedThinking {
+		out := make(chan Result[Message], 1)
 		defer close(out)
-		out <- Err[ChatEvent](errors.New("tools cannot be used with extended thinking for now"))
+		out <- Err[Message](errors.New("tools cannot be used with extended thinking for now"))
 		return out
 	}
-	copied := make([]ChatEvent, len(history))
+	copied := make([]Message, len(history))
 	copy(copied, history)
-	return streamWithTools(ctx, opts.Tools, &copied, func() <-chan Result[ChatEvent] {
+	return streamWithTools(ctx, opts.Tools, &copied, func() <-chan Result[Message] {
 		resp, err := m.request(ctx, copied, opts)
 		if err != nil {
-			out := make(chan Result[ChatEvent], 1)
+			out := make(chan Result[Message], 1)
 			defer close(out)
-			out <- Err[ChatEvent](err)
+			out <- Err[Message](err)
 			return out
 		}
 		return streamAnthropic(resp)
@@ -72,7 +72,7 @@ func (m *anthropicModel) StreamCompletion(
 }
 
 func (m *anthropicModel) request(
-	ctx context.Context, history []ChatEvent, opts StreamCompletionOpts,
+	ctx context.Context, history []Message, opts GenerationConfig,
 ) (*http.Response, error) {
 	// basic text message
 	type reqTextMessage struct {
@@ -128,15 +128,8 @@ func (m *anthropicModel) request(
 			BudgetTokens: 8192,
 		}
 	}
-	// populate the system prompt
-	if len(opts.SystemPrompt) > 0 {
-		loc, _ := time.LoadLocation("Europe/Helsinki")
-		now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
-		systemPrompt := strings.ReplaceAll(opts.SystemPrompt, "{{current_time}}", now)
-		b.System = &systemPrompt
-	}
 	// populate the tools
-	if opts.UseTools {
+	if opts.Tools.Count() > 0 {
 		for _, t := range opts.Tools.List() {
 			spec, err := m.spec(t.Spec())
 			if err != nil {
@@ -148,16 +141,21 @@ func (m *anthropicModel) request(
 	// append the message history
 	for _, i := range history {
 		switch i := i.(type) {
-		case *AssistantMessageChatEvent:
+		case *SystemMessage:
+			loc, _ := time.LoadLocation("Europe/Helsinki")
+			now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
+			systemPrompt := strings.ReplaceAll(i.Content, "{{current_time}}", now)
+			b.System = &systemPrompt
+		case *AssistantMessage:
 			content := []any{}
 			content = append(content, reqTextMessage{
 				Type: "text",
-				Text: i.content,
+				Text: i.Content,
 			})
-			for _, t := range i.toolCalls {
+			for _, t := range i.ToolCalls {
 				content = append(content, reqToolUseMessage{
 					Type:  "tool_use",
-					ID:    t.ID,
+					ID:    t.CallID,
 					Name:  t.FuncName,
 					Input: json.RawMessage(t.FuncArgs),
 				})
@@ -166,22 +164,37 @@ func (m *anthropicModel) request(
 				Role:    "assistant",
 				Content: content,
 			})
-		case *ToolMessageChatEvent:
+		case *ToolMessage:
 			content := []any{}
-			content = append(content, reqToolResultMessage{
-				Type:      "tool_result",
-				ToolUseID: i.callID,
-				Content:   i.content,
-			})
+			if i.Error != nil {
+				result := map[string]any{
+					"ok": false,
+					"error": map[string]any{
+						"code":    i.Error.Code,
+						"message": i.Error.Message,
+					},
+				}
+				content = append(content, reqToolResultMessage{
+					Type:      "tool_result",
+					ToolUseID: i.CallID,
+					Content:   string(util.Must(json.Marshal(result))),
+				})
+			} else {
+				content = append(content, reqToolResultMessage{
+					Type:      "tool_result",
+					ToolUseID: i.CallID,
+					Content:   *i.Result,
+				})
+			}
 			b.Messages = append(b.Messages, reqMessage{
 				Role:    "user",
 				Content: content,
 			})
-		case *UserMessageChatEvent:
+		case *UserMessage:
 			content := []any{}
 			content = append(content, reqTextMessage{
 				Type: "text",
-				Text: i.content,
+				Text: i.Content,
 			})
 			b.Messages = append(b.Messages, reqMessage{
 				Role:    "user",

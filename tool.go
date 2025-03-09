@@ -33,6 +33,12 @@ func (tc *ToolCatalog) Register(tool Tool) error {
 	return nil
 }
 
+func (tc *ToolCatalog) Count() int {
+	tc.mux.RLock()
+	defer tc.mux.RUnlock()
+	return len(tc.tools)
+}
+
 func (tc *ToolCatalog) List() []Tool {
 	tc.mux.RLock()
 	defer tc.mux.RUnlock()

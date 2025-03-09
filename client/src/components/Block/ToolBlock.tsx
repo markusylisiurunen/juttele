@@ -1,9 +1,9 @@
 import { BracesIcon, CopyIcon } from "lucide-react";
 import React from "react";
-import { ToolCallBlock } from "../../blocks";
+import { ToolBlock } from "../../blocks";
 import { useBlock } from "../../hooks";
 import { tryOr } from "../../utils";
-import styles from "./ToolCallBlock.module.css";
+import styles from "./ToolBlock.module.css";
 
 function formatFunc(name: string, args: string): [string, string] {
   args = tryOr(() => JSON.stringify(JSON.parse(args)), args);
@@ -11,10 +11,10 @@ function formatFunc(name: string, args: string): [string, string] {
   return [name, args];
 }
 
-type ToolCallComponentProps = {
-  block: ToolCallBlock;
+type ToolComponentProps = {
+  block: ToolBlock;
 };
-const ToolCallComponent: React.FC<ToolCallComponentProps> = ({ block }) => {
+const ToolComponent: React.FC<ToolComponentProps> = ({ block }) => {
   const { isActive } = useBlock();
   const [name, args] = formatFunc(block.name, block.args);
   const label = `${name}(${args})`;
@@ -33,11 +33,11 @@ const ToolCallComponent: React.FC<ToolCallComponentProps> = ({ block }) => {
     </div>
   );
 };
-const MemoedToolCallComponent = React.memo(ToolCallComponent, (prev, next) => {
+const MemoedToolComponent = React.memo(ToolComponent, (prev, next) => {
   if (prev.block.id !== next.block.id) return false;
   if (prev.block.name !== next.block.name) return false;
   if (prev.block.args !== next.block.args) return false;
   return true;
 });
 
-export { MemoedToolCallComponent as ToolCall };
+export { MemoedToolComponent as Tool };

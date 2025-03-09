@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/markusylisiurunen/juttele/internal/logger"
 	"github.com/markusylisiurunen/juttele/internal/repo"
-	"github.com/markusylisiurunen/juttele/internal/util"
 	"github.com/tidwall/gjson"
 )
 
@@ -72,108 +70,108 @@ func (app *App) rpcCreateChat(ctx context.Context, args []byte) ([]byte, error) 
 }
 
 func (app *App) rpcRenameChat(ctx context.Context, args []byte) ([]byte, error) {
-	chatID := gjson.GetBytes(args, "id").Int()
-	if chatID == 0 {
-		return nil, fmt.Errorf("id is required")
-	}
-	modelID := gjson.GetBytes(args, "model_id").String()
-	if modelID == "" {
-		return nil, fmt.Errorf("model_id is required")
-	}
-	var model Model
-	modelFound := false
-	for _, m := range app.models {
-		if m.GetModelInfo().ID == modelID {
-			model = m
-			modelFound = true
-			break
-		}
-	}
-	if !modelFound {
-		return nil, fmt.Errorf("model with ID %q not found", modelID)
-	}
-	var systemPrompt = `
-Your task is to come up with a short name for the following conversation between the user and an LLM assistant.
-The name should be concise (roughly 3 to 10 words) and descriptive, capturing the main theme or topic of the conversation.
-Do not capitalize every word, only the first word and any proper nouns should be capitalized.
-The name should be in English and should not contain any special characters or punctuation.
+	// 	chatID := gjson.GetBytes(args, "id").Int()
+	// 	if chatID == 0 {
+	// 		return nil, fmt.Errorf("id is required")
+	// 	}
+	// 	modelID := gjson.GetBytes(args, "model_id").String()
+	// 	if modelID == "" {
+	// 		return nil, fmt.Errorf("model_id is required")
+	// 	}
+	// 	var model Model
+	// 	modelFound := false
+	// 	for _, m := range app.models {
+	// 		if m.GetModelInfo().ID == modelID {
+	// 			model = m
+	// 			modelFound = true
+	// 			break
+	// 		}
+	// 	}
+	// 	if !modelFound {
+	// 		return nil, fmt.Errorf("model with ID %q not found", modelID)
+	// 	}
+	// 	var systemPrompt = `
+	// Your task is to come up with a short name for the following conversation between the user and an LLM assistant.
+	// The name should be concise (roughly 3 to 10 words) and descriptive, capturing the main theme or topic of the conversation.
+	// Do not capitalize every word, only the first word and any proper nouns should be capitalized.
+	// The name should be in English and should not contain any special characters or punctuation.
 
-Here is the conversation:
-{{conversation}}
+	// Here is the conversation:
+	// {{conversation}}
 
-Your response must be exactly one line long, and should only include the name.
+	// Your response must be exactly one line long, and should only include the name.
 
-<example_response>
-Name: A conversation about the weather
-<example_response>
-	`
-	systemPrompt = strings.TrimSpace(systemPrompt)
-	conversation := []struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}{}
-	events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{ChatID: chatID})
-	if err != nil {
-		return nil, fmt.Errorf("error listing chat events: %w", err)
-	}
-	for _, i := range events.Items {
-		if !strings.HasPrefix(i.Kind, "message.") {
-			continue
-		}
-		event, err := parseChatEvent(i.CreatedAt, i.UUID, i.Kind, i.Content)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing chat event: %w", err)
-		}
-		if i.Kind == chatEventMessageAssistant {
-			conversation = append(conversation, struct {
-				Role    string `json:"role"`
-				Content string `json:"content"`
-			}{
-				Role:    "assistant",
-				Content: event.(*AssistantMessageChatEvent).content,
-			})
-		} else if i.Kind == chatEventMessageUser {
-			conversation = append(conversation, struct {
-				Role    string `json:"role"`
-				Content string `json:"content"`
-			}{
-				Role:    "user",
-				Content: event.(*UserMessageChatEvent).content,
-			})
-		}
-	}
-	systemPrompt = strings.ReplaceAll(systemPrompt,
-		"{{conversation}}",
-		string(util.Must(json.MarshalIndent(conversation, "", "  "))),
-	)
-	opts := StreamCompletionOpts{
-		SystemPrompt: systemPrompt,
-	}
-	out := model.StreamCompletion(ctx, []ChatEvent{
-		NewUserMessageChatEvent("Please rename the chat."),
-		NewAssistantMessageChatEvent("Name:"),
-	}, opts)
-	var completion string
-	for i := range out {
-		if i.Err != nil {
-			return nil, fmt.Errorf("error getting completion: %v", i.Err)
-		}
-		switch i := i.Val.(type) {
-		case *AssistantMessageChatEvent:
-			completion = i.content
-			continue
-		}
-	}
-	completion = strings.TrimSpace(completion)
-	if len(completion) <= 3 || len(completion) >= 256 || strings.Contains(completion, "\n") {
-		return nil, fmt.Errorf("error getting completion: %q", completion)
-	}
-	if err := app.repo.UpdateChat(ctx, repo.UpdateChatArgs{
-		ID:    chatID,
-		Title: completion,
-	}); err != nil {
-		return nil, fmt.Errorf("error updating chat: %w", err)
-	}
+	// <example_response>
+	// Name: A conversation about the weather
+	// <example_response>
+	// 	`
+	// 	systemPrompt = strings.TrimSpace(systemPrompt)
+	// 	conversation := []struct {
+	// 		Role    string `json:"role"`
+	// 		Content string `json:"content"`
+	// 	}{}
+	// 	events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{ChatID: chatID})
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("error listing chat events: %w", err)
+	// 	}
+	// 	for _, i := range events.Items {
+	// 		if !strings.HasPrefix(i.Kind, "message.") {
+	// 			continue
+	// 		}
+	// 		event, err := parseChatEvent(i.CreatedAt, i.UUID, i.Kind, i.Content)
+	// 		if err != nil {
+	// 			return nil, fmt.Errorf("error parsing chat event: %w", err)
+	// 		}
+	// 		if i.Kind == chatEventMessageAssistant {
+	// 			conversation = append(conversation, struct {
+	// 				Role    string `json:"role"`
+	// 				Content string `json:"content"`
+	// 			}{
+	// 				Role:    "assistant",
+	// 				Content: event.(*AssistantMessageChatEvent).content,
+	// 			})
+	// 		} else if i.Kind == chatEventMessageUser {
+	// 			conversation = append(conversation, struct {
+	// 				Role    string `json:"role"`
+	// 				Content string `json:"content"`
+	// 			}{
+	// 				Role:    "user",
+	// 				Content: event.(*UserMessageChatEvent).content,
+	// 			})
+	// 		}
+	// 	}
+	// 	systemPrompt = strings.ReplaceAll(systemPrompt,
+	// 		"{{conversation}}",
+	// 		string(util.Must(json.MarshalIndent(conversation, "", "  "))),
+	// 	)
+	// 	opts := StreamCompletionOpts{
+	// 		SystemPrompt: systemPrompt,
+	// 	}
+	// 	out := model.StreamCompletion(ctx, []ChatEvent{
+	// 		NewUserMessageChatEvent("Please rename the chat."),
+	// 		NewAssistantMessageChatEvent("Name:"),
+	// 	}, opts)
+	// 	var completion string
+	// 	for i := range out {
+	// 		if i.Err != nil {
+	// 			return nil, fmt.Errorf("error getting completion: %v", i.Err)
+	// 		}
+	// 		switch i := i.Val.(type) {
+	// 		case *AssistantMessageChatEvent:
+	// 			completion = i.content
+	// 			continue
+	// 		}
+	// 	}
+	// 	completion = strings.TrimSpace(completion)
+	// 	if len(completion) <= 3 || len(completion) >= 256 || strings.Contains(completion, "\n") {
+	// 		return nil, fmt.Errorf("error getting completion: %q", completion)
+	// 	}
+	// 	if err := app.repo.UpdateChat(ctx, repo.UpdateChatArgs{
+	// 		ID:    chatID,
+	// 		Title: completion,
+	// 	}); err != nil {
+	// 		return nil, fmt.Errorf("error updating chat: %w", err)
+	// 	}
 	type resp struct {
 		Ok bool `json:"ok"`
 	}

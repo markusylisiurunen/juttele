@@ -13,21 +13,20 @@ type ModelPersonality struct {
 	Name         string
 	SystemPrompt string
 }
+
 type ModelInfo struct {
 	ID            string
 	Name          string
 	Personalities []ModelPersonality
 }
 
-type StreamCompletionOpts struct {
-	SystemPrompt string
-	Tools        *ToolCatalog
-	UseTools     bool
+type GenerationConfig struct {
+	Tools *ToolCatalog
 }
 
 type Model interface {
 	GetModelInfo() ModelInfo
-	StreamCompletion(context.Context, []ChatEvent, StreamCompletionOpts) <-chan Result[ChatEvent]
+	StreamCompletion(context.Context, []Message, GenerationConfig) <-chan Result[Message]
 }
 
 type model struct {
