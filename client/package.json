@@ -17,7 +17,7 @@
     "@tauri-apps/plugin-store": "^2.2.0",
     "classnames": "^2.5.1",
     "katex": "^0.16.21",
-    "lucide-react": "^0.479.0",
+    "lucide-react": "^0.481.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
@@ -25,7 +25,7 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
-    "shiki": "^3.1.0",
+    "shiki": "^3.2.1",
     "use-sync-external-store": "^1.4.0",
     "zod": "^3.24.2"
   },
@@ -36,6 +36,6 @@
     "@types/use-sync-external-store": "^0.0.6",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "~5.8.2",
-    "vite": "^6.2.1"
+    "vite": "^6.2.2"
   }
 }
