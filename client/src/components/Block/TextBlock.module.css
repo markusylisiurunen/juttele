@@ -93,6 +93,9 @@
 .content p {
   margin-block: var(--gap-md);
 }
+.content li p {
+  margin-block: var(--gap-sm);
+}
 .content h1 + p,
 .content h2 + p,
 .content h3 + p,
@@ -123,6 +126,10 @@
 }
 .content div:has(> pre) {
   margin-block: var(--gap-md);
+}
+.content ul div:has(> pre),
+.content ol div:has(> pre) {
+  margin-block: 0px;
 }
 .content div > pre {
   margin-block: 0px;
@@ -239,6 +246,10 @@
   border-radius: 12px;
   border: 1px solid var(--color-border-tertiary);
   margin-inline: calc(-1 * var(--spacing-padding-x));
+}
+.content ul [data-el="pre"],
+.content ol [data-el="pre"] {
+  margin-inline: 0px;
 }
 .content [data-el="pre"] > div {
   align-items: center;
