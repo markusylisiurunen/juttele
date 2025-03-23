@@ -1,4 +1,3 @@
-import { CircleXIcon } from "lucide-react";
 import React from "react";
 import { ErrorBlock } from "../../blocks";
 import styles from "./ErrorBlock.module.css";
@@ -9,8 +8,12 @@ type ErrorComponentProps = {
 const ErrorComponent: React.FC<ErrorComponentProps> = ({ block }) => {
   return (
     <div className={styles.root} data-block="error">
-      <CircleXIcon size={15} />
-      <span>{block.error.message}</span>
+      <div className={styles.header}>
+        <span>An error happened</span>
+      </div>
+      <div className={styles.content}>
+        <span>{block.error.message}</span>
+      </div>
     </div>
   );
 };

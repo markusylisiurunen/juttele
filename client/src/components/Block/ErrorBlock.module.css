@@ -1,20 +1,35 @@
 .root {
-  --color-accent: lch(56% 80 10);
+  --color-bg-tertiary: lch(5.2% 4 28);
+  --color-border-tertiary: lch(7.2% 6 28);
+  --color-text: lch(92% 24 28);
+}
+.root {
+  background: var(--color-bg-tertiary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-tertiary);
+}
+.header {
   align-items: center;
-  background: color-mix(in srgb, var(--color-accent) 2%, transparent);
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 10%, transparent);
   display: flex;
-  gap: 8px;
-  margin-inline: var(--spacing-padding-x);
-  padding-block: 6px;
-  padding-inline: 8px;
+  justify-content: space-between;
+  padding-block: 8px;
+  padding-inline: var(--spacing-padding-x);
 }
-.root svg {
-  color: color-mix(in srgb, var(--color-accent) 75%, var(--color-text));
-  flex: 0 0 auto;
+.header span {
+  color: color-mix(in srgb, var(--color-text) 92%, transparent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
-.root span {
-  color: color-mix(in srgb, var(--color-accent) 20%, var(--color-text));
-  flex: 1 1 auto;
+.content {
+  border-top: 1px solid var(--color-border-tertiary);
+  color: color-mix(in srgb, var(--color-text) 67%, transparent);
+  display: block;
+  padding-block: var(--spacing-padding-x);
+  padding-inline: var(--spacing-padding-x);
+}
+.content span {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
