@@ -22,6 +22,7 @@ type ModelInfo struct {
 
 type GenerationConfig struct {
 	Tools *ToolCatalog
+	Think bool
 }
 
 type Model interface {

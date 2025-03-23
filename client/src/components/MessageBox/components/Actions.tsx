@@ -74,7 +74,7 @@ const SendButton: React.FC<SendButtonProps> = ({ onSend, onCancel }) => {
   const generating = useAtomWithSelector(useApp().generation, (state) => state.generating);
   return (
     <button className={styles.sendButton} onClick={generating ? onCancel : onSend}>
-      {generating || true ? (
+      {generating ? (
         <div
           style={{
             background: "currentColor",

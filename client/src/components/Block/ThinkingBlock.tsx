@@ -1,8 +1,7 @@
-import { BrainIcon, CopyIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { ThinkingBlock } from "../../blocks";
 import { useBlock } from "../../hooks";
-import styles from "./Thinking.module.css";
+import styles from "./ThinkingBlock.module.css";
 
 function useSeconds() {
   const { isActive } = useBlock();
@@ -31,29 +30,33 @@ type ThinkingComponentProps = {
 const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ block }) => {
   const cot = block.content.trim();
   const { isActive } = useBlock();
+  const [expanded, setExpanded] = useState(isActive);
   const seconds = useSeconds();
+  useEffect(() => {
+    if (isActive) return;
+    setExpanded(false);
+  }, [isActive]);
+  function onExpandOrCollapse() {
+    setExpanded(!expanded);
+  }
   function onCopy() {
     navigator.clipboard.writeText(cot);
   }
-  const label = isActive ? `Thinking (${seconds}s)...` : "Thinking done";
+  const label = isActive ? `thinking (${seconds}s)...` : "thinking done";
   return (
-    <div className={styles.root} data-block="thinking" data-active={isActive ? "" : undefined}>
-      <div className={styles.container}>
-        <div className={styles.block}>
-          <BrainIcon size={15} />
-          <span>{label}</span>
+    <div className={styles.root} data-block="thinking">
+      <div className={styles.header}>
+        <span>{label}</span>
+        <div className={styles.actions}>
+          <button onClick={onExpandOrCollapse}>{expanded ? "collapse" : "expand"}</button>
+          <button onClick={onCopy}>copy</button>
         </div>
-        <button className={styles.copy} onClick={onCopy}>
-          <CopyIcon size={15} />
-        </button>
       </div>
-      {isActive && cot !== "" ? (
-        <div className={styles.preview}>
-          {cot.split("\n").map((line, i) => (
-            <p key={i}>{line}</p>
-          ))}
-        </div>
-      ) : null}
+      <div className={styles.content} data-expanded={expanded ? "" : undefined}>
+        {cot.split("\n").map((line, idx) => (
+          <p key={idx}>{line}</p>
+        ))}
+      </div>
     </div>
   );
 };

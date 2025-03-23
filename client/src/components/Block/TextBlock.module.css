@@ -242,24 +242,24 @@
 }
 .content [data-el="pre"] > div {
   align-items: center;
+  border-bottom: 1px solid var(--color-border-tertiary);
   display: flex;
-  gap: 8px;
   justify-content: space-between;
-  padding-block: 6px 0px;
+  padding-block: 6px;
   padding-inline: var(--spacing-padding-x);
 }
 .content [data-el="pre"] > div span {
-  color: color-mix(in srgb, var(--color-text) 67%, transparent);
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
   font-family: "JetBrains Mono", monospace;
   font-size: 13px;
-  letter-spacing: initial;
+  letter-spacing: -0.02em;
   line-height: 1.2;
 }
 .content [data-el="pre"] > div button {
   color: color-mix(in srgb, var(--color-text) 33%, transparent);
   font-family: "JetBrains Mono", monospace;
   font-size: 13px;
-  letter-spacing: initial;
+  letter-spacing: -0.02em;
   line-height: 1.2;
   padding-block: 4px;
   padding-inline: 0px;
@@ -275,7 +275,7 @@
   line-height: 1.5;
   margin: 0px;
   overflow-x: auto;
-  padding-block: 8px 16px;
+  padding-block: var(--spacing-padding-x);
   padding-inline: var(--spacing-padding-x);
 }
 .content pre::-webkit-scrollbar {
@@ -284,6 +284,6 @@
 .content pre > code {
   font-family: "JetBrains Mono", monospace;
   font-size: inherit;
-  letter-spacing: initial;
+  letter-spacing: -0.02em;
   line-height: inherit;
 }

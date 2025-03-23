@@ -101,7 +101,10 @@ const App: React.FC<AppProps> = ({ chatId, onShowChats, onReset }) => {
       />
       <div className={styles.content}>
         <ChatHistory chatId={chatId} scrollRef={scrollRef} />
-        <MessageBox onSend={(message) => onMessage(message)} onCancel={() => {}} />
+        <MessageBox
+          onSend={(message) => onMessage(message)}
+          onCancel={() => {} /* TODO: cancel the generation */}
+        />
       </div>
     </div>
   );
