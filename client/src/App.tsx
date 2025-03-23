@@ -145,6 +145,8 @@ const AppWrapper: React.FC = () => {
       }) as Promise<{ chat_id: number }>,
     ]);
     setChatId(chat.chat_id);
+    const data = await app.api.getData();
+    app.data.set(data);
   }
   useMountOnce(() => void init());
   if (!chatId) {

@@ -1,7 +1,7 @@
 import { load } from "@tauri-apps/plugin-store";
 import { createContext, useMemo, useState } from "react";
 import { API, ConfigResponse, DataResponse } from "../api";
-import { useMount } from "../hooks";
+import { useMountOnce } from "../hooks";
 import { atom, Atom } from "../utils";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -48,7 +48,7 @@ const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       })
     );
   }
-  useMount(() => {
+  useMountOnce(() => {
     void init();
   });
   if (!generationAtom || !configAtom || !dataAtom) {
