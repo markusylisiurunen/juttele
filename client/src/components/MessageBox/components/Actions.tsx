@@ -1,4 +1,4 @@
-import { ArrowUp, ChevronDown, Diamond, Lightbulb, Parentheses } from "lucide-react";
+import { ArrowUp, ChevronDown, Lightbulb, Parentheses } from "lucide-react";
 import React from "react";
 import { useApp } from "../../../hooks";
 import { useAtomWithSelector } from "../../../utils";
@@ -74,8 +74,15 @@ const SendButton: React.FC<SendButtonProps> = ({ onSend, onCancel }) => {
   const generating = useAtomWithSelector(useApp().generation, (state) => state.generating);
   return (
     <button className={styles.sendButton} onClick={generating ? onCancel : onSend}>
-      {generating ? (
-        <Diamond size={15} strokeWidth={2.5} style={{ transform: "rotate(45deg)" }} />
+      {generating || true ? (
+        <div
+          style={{
+            background: "currentColor",
+            borderRadius: "2px",
+            height: "10px",
+            width: "10px",
+          }}
+        />
       ) : (
         <ArrowUp size={15} strokeWidth={2.5} />
       )}

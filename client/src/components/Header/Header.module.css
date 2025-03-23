@@ -47,14 +47,14 @@
   width: 28px;
 }
 .iconButton:hover {
-  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
   color: var(--color-text);
 }
 .textButton {
   align-items: center;
   background: color-mix(in srgb, var(--color-text) 4%, transparent);
   border-radius: 5px;
-  color: color-mix(in srgb, var(--color-text) 67%, var(--color-bg));
+  color: color-mix(in srgb, var(--color-text) 50%, var(--color-bg));
   display: flex;
   flex: 0 0 auto;
   height: 28px;

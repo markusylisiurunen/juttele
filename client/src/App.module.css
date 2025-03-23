@@ -28,14 +28,14 @@
 .chats button {
   background: color-mix(in srgb, var(--color-text) 2%, transparent);
   border-radius: 5px;
-  color: color-mix(in srgb, var(--color-text) 67%, transparent);
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
   display: flex;
   overflow: hidden;
   padding: 10px 12px;
   transition: background 90ms linear, color 90ms linear;
 }
 .chats button:hover {
-  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  background: color-mix(in srgb, var(--color-text) 3%, transparent);
   color: var(--color-text);
 }
 .chats button span {
