@@ -1,74 +1,67 @@
 .root {
+  background: var(--color-bg-tertiary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-tertiary);
+}
+.header {
   align-items: center;
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
+  padding-block: 6px;
   padding-inline: var(--spacing-padding-x);
 }
-.root {
-  --color-accent: hsl(284, 0%, 25%);
-}
-.root:where([data-active]) .block {
-  --color-accent: hsl(265, 100%, 60%);
-}
-.block {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--color-accent) 20%, transparent),
-    color-mix(in srgb, var(--color-accent) 6%, transparent)
-  );
-
+.header .actions {
   align-items: center;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
-  box-shadow: 0 0 0 0 transparent;
   display: flex;
-  gap: 4px;
-  max-width: 67%;
-  overflow: hidden;
-  padding-block: 4px;
-  padding-inline: 6px 12px;
-  transition: background 200ms linear, box-shadow 200ms linear, border 200ms linear;
+  gap: var(--spacing-padding-x);
 }
-.root:where([data-active]) .block {
-  box-shadow: 0 0 16px 0 color-mix(in srgb, var(--color-accent) 12%, transparent);
-}
-.block > svg {
-  color: color-mix(in srgb, var(--color-text) 50%, var(--color-accent));
-  display: block;
-  flex-shrink: 0;
-  opacity: 0.33;
-}
-.block > span {
-  color: var(--color-text);
-  display: block;
+.header span {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
   font-family: "JetBrains Mono", monospace;
-  font-size: 14px;
-  letter-spacing: -0.05em;
-  overflow: hidden;
-  padding-block-start: 0.5px;
-  text-overflow: ellipsis;
-  transition: color 200ms linear;
-  white-space: nowrap;
+  font-size: 13px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
-.root:where(:not([data-active])) .block > span {
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
-}
-.copy {
-  align-items: center;
-  appearance: none;
-  aspect-ratio: 1 / 1;
-  border-radius: 0px;
-  border: none;
-  color: color-mix(in srgb, var(--color-text) 25%, transparent);
-  display: flex;
-  flex-shrink: 0;
-  height: 28px;
-  justify-content: center;
-  margin-inline-start: 2px;
-  outline: none;
-  padding: 0px;
+.header button {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  padding-block: 4px;
+  padding-inline: 0px;
   transition: color 90ms linear;
 }
-.copy:hover {
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+.header button:hover {
+  color: var(--color-text);
+}
+.content {
+  border-top: 1px solid var(--color-border-tertiary);
+  column-gap: 12px;
+  display: none;
+  grid-template-columns: auto 1fr;
+  padding-block: var(--spacing-padding-x);
+  padding-inline: var(--spacing-padding-x);
+  row-gap: 8px;
+}
+.content:where([data-expanded]) {
+  display: grid;
+}
+.arg {
+  color: color-mix(in srgb, var(--color-text) 67%, transparent);
+  display: grid;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  grid-column: span 2;
+  grid-template-columns: subgrid;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.arg > :first-child {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+}
+.arg > :last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

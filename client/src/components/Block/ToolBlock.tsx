@@ -1,5 +1,4 @@
-import { BracesIcon, CopyIcon } from "lucide-react";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ToolBlock } from "../../blocks";
 import { useBlock } from "../../hooks";
 import { tryOr } from "../../utils";
@@ -17,19 +16,37 @@ type ToolComponentProps = {
 const ToolComponent: React.FC<ToolComponentProps> = ({ block }) => {
   const { isActive } = useBlock();
   const [name, args] = formatFunc(block.name, block.args);
-  const label = `${name}(${args})`;
+  const [expanded, setExpanded] = useState(isActive);
+  useEffect(() => {
+    if (isActive) return;
+    setExpanded(false);
+  }, [isActive]);
+  function onExpandOrCollapse() {
+    setExpanded(!expanded);
+  }
   function onCopy() {
     navigator.clipboard.writeText(args);
   }
+  const label = `${name}()`;
   return (
-    <div className={styles.root} data-block="tool-call" data-active={isActive ? "" : undefined}>
-      <div className={styles.block}>
-        <BracesIcon size={15} />
+    <div className={styles.root} data-block="tool-call">
+      <div className={styles.header}>
         <span>{label}</span>
+        <div className={styles.actions}>
+          <button onClick={onExpandOrCollapse}>{expanded ? "collapse" : "expand"}</button>
+          <button onClick={onCopy}>copy</button>
+        </div>
       </div>
-      <button className={styles.copy} onClick={onCopy}>
-        <CopyIcon size={15} />
-      </button>
+      <div className={styles.content} data-expanded={expanded ? "" : undefined}>
+        {Object.entries(tryOr(() => JSON.parse(block.args), {})).map(([key, value], idx) => {
+          return (
+            <div key={idx} className={styles.arg}>
+              <span>{key}</span>
+              <span>{`${value}`}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
