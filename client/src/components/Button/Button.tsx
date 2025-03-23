@@ -1,22 +1,32 @@
 import classNames from "classnames";
-import { DynamicIcon, IconName } from "lucide-react/dynamic";
 import React from "react";
 import styles from "./Button.module.css";
 
 type ButtonProps = {
+  className?: string;
   glowing?: boolean;
-  icon?: IconName;
+  iconLeft?: React.ReactNode;
+  iconRight?: React.ReactNode;
   label: string;
   onClick?: () => void;
 };
-const Button: React.FC<ButtonProps> = ({ glowing, icon, label, onClick }) => {
+const Button: React.FC<ButtonProps> = ({
+  className,
+  glowing,
+  iconLeft,
+  iconRight,
+  label,
+  onClick,
+}) => {
   return (
     <button
-      className={classNames(styles.button, glowing ? styles.glowing : null)}
+      data-glowing={glowing ? "" : undefined}
+      className={classNames(styles.button, glowing ? styles.glowing : null, className)}
       onClick={onClick}
     >
-      {icon ? <DynamicIcon name={icon} size={15} /> : null}
+      {iconLeft}
       <span>{label}</span>
+      {iconRight}
     </button>
   );
 };

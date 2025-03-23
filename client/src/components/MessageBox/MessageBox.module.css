@@ -1,54 +1,16 @@
 .root {
+  padding-block: 0px 1px;
+  padding-inline: var(--spacing-padding-x);
   width: 100%;
 }
-.main {
-  padding-block-start: 8px;
-  padding-inline: var(--spacing-padding-x);
+.container {
+  background: var(--color-bg-secondary);
+  border-radius: 16px 16px 0px 0px;
+  border: 1px solid var(--color-border-secondary);
+  margin-inline: auto;
+  max-width: var(--max-width);
+  overflow: hidden;
 }
-.main textarea {
-  --color-bg: color-mix(in srgb, var(--color-text) 2%, transparent);
-  --color-border: color-mix(in srgb, var(--color-text) 4%, transparent);
-  --color-border-focus: color-mix(in srgb, var(--color-text) 12%, transparent);
-  --color-placeholder: color-mix(in srgb, var(--color-text) 25%, transparent);
-  appearance: none;
-  background: var(--color-bg);
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
-  color: inherit;
-  display: block;
-  font-size: inherit;
-  height: calc(2 * (8px + 1px) + 4em);
-  line-height: inherit;
-  outline: none;
-  padding-block: 8px;
-  padding-inline: 10px;
-  resize: none;
-  transition: border 90ms linear;
-  width: 100%;
-}
-.main textarea::placeholder {
-  color: var(--color-placeholder);
-}
-.main textarea:focus-visible {
-  border-color: var(--color-border-focus);
-}
-
-.footer {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-  justify-content: space-between;
-  padding-block: 6px;
-  padding-inline: var(--spacing-padding-x);
-}
-.footer > div {
-  align-items: center;
-  display: flex;
-  gap: 4px;
-}
-.footer .responding {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 14px;
-  letter-spacing: -0.05em;
-  opacity: 0.25;
+.container {
+  border-bottom: none;
 }

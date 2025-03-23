@@ -1,6 +1,8 @@
 import React from "react";
 import { AnyBlock } from "../../blocks";
 import { BlockProvider } from "../../contexts";
+import { useApp } from "../../hooks";
+import { useAtomWithSelector } from "../../utils";
 import { Block } from "../Block/Block";
 import styles from "./ChatHistory.module.css";
 
@@ -17,7 +19,7 @@ const Divider: React.FC<DividerProps> = ({ prev, next }) => {
       (prev.type === "text" && prev.role === "user") ||
       (next.type === "text" && next.role === "user")
     ) {
-      return 1.75 * GAP_MD;
+      return 1.5 * GAP_MD;
     }
     if (prev.type === "thinking") {
       if (next.type === "thinking") return GAP_SM;
@@ -39,11 +41,16 @@ const Divider: React.FC<DividerProps> = ({ prev, next }) => {
 };
 
 type ChatHistoryProps = {
-  blocks: AnyBlock[];
+  chatId: number;
   scrollRef: React.RefObject<HTMLDivElement>;
-  streaming: boolean;
 };
-const ChatHistory: React.FC<ChatHistoryProps> = ({ blocks, scrollRef, streaming }) => {
+const ChatHistory: React.FC<ChatHistoryProps> = ({ chatId, scrollRef }) => {
+  const streaming = useAtomWithSelector(useApp().generation, (state) => state.generating);
+  let blocks = useAtomWithSelector(useApp().data, (data) => {
+    const chat = data.chats.find((chat) => chat.id === chatId);
+    if (!chat) return [];
+    return chat.blocks;
+  });
   blocks = blocks.filter((i) => {
     if (i.type === "text" && i.content.trim() === "") return false;
     return true;
@@ -51,33 +58,35 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ blocks, scrollRef, streaming 
   return (
     <div className={styles.root}>
       <div className={styles.history} ref={scrollRef}>
-        {blocks.map((b, idx) => {
-          const p = idx === 0 ? null : blocks[idx - 1] ?? null;
-          const isActive = streaming && idx === blocks.length - 1;
-          let child: React.ReactNode = null;
-          switch (b.type) {
-            case "thinking":
-              child = <Block.Thinking block={b} />;
-              break;
-            case "text":
-              child = <Block.Text block={b} />;
-              break;
-            case "tool":
-              child = <Block.Tool block={b} />;
-              break;
-            case "error":
-              child = <Block.Error block={b} />;
-              break;
-            default:
-              return [];
-          }
-          return (
-            <React.Fragment key={b.id}>
-              <Divider prev={p} next={b} />
-              <BlockProvider isActive={isActive}>{child}</BlockProvider>
-            </React.Fragment>
-          );
-        })}
+        <div className={styles.blocks}>
+          {blocks.map((b, idx) => {
+            const p = idx === 0 ? null : blocks[idx - 1] ?? null;
+            const isActive = streaming && idx === blocks.length - 1;
+            let child: React.ReactNode = null;
+            switch (b.type) {
+              case "thinking":
+                child = <Block.Thinking block={b} />;
+                break;
+              case "text":
+                child = <Block.Text block={b} />;
+                break;
+              case "tool":
+                child = <Block.Tool block={b} />;
+                break;
+              case "error":
+                child = <Block.Error block={b} />;
+                break;
+              default:
+                return [];
+            }
+            return (
+              <React.Fragment key={b.id}>
+                <Divider prev={p} next={b} />
+                <BlockProvider isActive={isActive}>{child}</BlockProvider>
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

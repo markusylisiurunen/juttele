@@ -4,32 +4,21 @@
 .button {
   align-items: center;
   appearance: none;
-  background: transparent;
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
   border-radius: calc(var(--size) / 2);
-  border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-text) 4%, transparent);
   color: color-mix(in srgb, var(--color-text) 67%, transparent);
   flex: 0 0 auto;
-  gap: 4px;
+  gap: 3px;
   height: var(--size);
+  padding-block: 0px;
   padding-inline: 8px;
   transition: background 90ms linear, border 90ms linear, color 90ms linear;
 }
-.button:not(.glowing):hover {
-  background: color-mix(in srgb, var(--color-text) 2%, transparent);
-  color: var(--color-text);
-}
 .glowing {
-  --color-accent: lch(54% 112 308);
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--color-accent) 20%, transparent),
-    color-mix(in srgb, var(--color-accent) 6%, transparent)
-  );
-  border-color: color-mix(in srgb, var(--color-accent) 33%, transparent);
-  color: color-mix(in srgb, var(--color-text) 60%, var(--color-accent));
-}
-.glowing:hover {
-  border-color: color-mix(in srgb, var(--color-accent) 42%, transparent);
+  background: var(--color-bg-glow);
+  border-color: var(--color-border-glow);
+  color: var(--color-text-glow);
 }
 .button svg {
   opacity: 0.5;

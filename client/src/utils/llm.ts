@@ -26,6 +26,7 @@ async function streamCompletion(
   modelId: string,
   personalityId: string,
   useTools: boolean,
+  think: boolean,
   content: string,
   tools: Tool[],
   onMessage: (message: StreamMessage) => void
@@ -42,6 +43,7 @@ async function streamCompletion(
           content: content,
           tools: tools.map((tool) => ({ name: tool.Name, spec: tool.Spec })),
           use_tools: useTools,
+          think: think,
         })
       );
     };

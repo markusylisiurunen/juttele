@@ -1,7 +1,6 @@
-import { CopyIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
-import { useBlock } from "../../../hooks";
+import { useBlock, useMount } from "../../../hooks";
 
 function language(el: HTMLPreElement) {
   let lang = "plaintext";
@@ -39,6 +38,10 @@ const Pre: React.FC<PreProps> = ({ children }) => {
   const { isActive } = useBlock();
   const ref = useRef<HTMLPreElement>(null);
   const copieable = useRef("");
+  useMount(() => {
+    if (isActive || !ref.current) return;
+    copieable.current = code(ref.current);
+  });
   if (isActive && ref.current) {
     copieable.current = code(ref.current);
   }
@@ -55,12 +58,10 @@ const Pre: React.FC<PreProps> = ({ children }) => {
     navigator.clipboard.writeText(copieable.current.trim() + "\n");
   }
   return (
-    <div>
+    <div data-el="pre">
       <div>
-        <button onClick={onCopy}>
-          <CopyIcon size={14} />
-        </button>
         <span>{lang}</span>
+        <button onClick={onCopy}>copy</button>
       </div>
       <pre ref={ref}>{children}</pre>
     </div>

@@ -1,0 +1,31 @@
+.root {
+  position: relative;
+}
+.button {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 4%, transparent);
+  color: color-mix(in srgb, var(--color-text) 67%, transparent);
+  display: flex;
+  font-size: 13px;
+  font-weight: 500;
+  gap: 3px;
+  height: 24px;
+  line-height: 1;
+  overflow: hidden;
+  padding-block: 0px;
+  padding-inline: 8px;
+  pointer-events: none;
+}
+.button svg {
+  opacity: 0.5;
+}
+.hidden {
+  appearance: none;
+  cursor: pointer;
+  inset: 0px;
+  opacity: 0;
+  position: absolute;
+  z-index: 1;
+}

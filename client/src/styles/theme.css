@@ -1,9 +1,17 @@
 :root {
+  --color-bg-glow: lch(12% 12 48);
+  --color-bg-secondary: lch(6.4% 0 0);
+  --color-bg-tertiary: lch(5.6% 0 0);
   --color-bg: lch(3.2% 0 0);
+  --color-border-glow: lch(24% 24 48);
+  --color-border-secondary: lch(16% 0 0);
+  --color-border-tertiary: lch(10% 0 0);
   --color-border-soft: lch(6.4% 0 0);
   --color-border: lch(20% 0 0);
+  --color-text-glow: lch(92% 40 48);
   --color-text-link: lch(82% 108 298);
+  --color-text-placeholder: lch(42% 0 0);
   --color-text: lch(97% 0 0);
-  --max-width: 800px;
+  --max-width: 640px;
   --spacing-padding-x: 12px;
 }

@@ -1,12 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 function useMount(effect: React.EffectCallback) {
-  const mounted = useRef(false);
-  useEffect(() => {
-    if (mounted.current) return;
-    mounted.current = true;
-    return effect();
-  }, []);
+  useEffect(() => effect(), []);
 }
 
 export { useMount };

@@ -5,7 +5,7 @@
 @import url("theme.css");
 
 :root {
-  background-color: var(--color-bg);
+  background: var(--color-bg);
   color-scheme: dark;
   color: var(--color-text);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
@@ -19,11 +19,6 @@
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
 }
-.dev {
-  background: hotpink;
-  height: 4px;
-  width: 100vw;
-}
 button {
   align-items: center;
   appearance: none;
@@ -33,57 +28,4 @@ button {
   display: flex;
   gap: 8px;
   padding: 0px;
-}
-
-.wrapper {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  height: 100vh;
-  width: 100vw;
-}
-.content {
-  display: flex;
-  flex-direction: column;
-  margin-block: 0px;
-  margin-inline: auto;
-  max-width: var(--max-width);
-  overflow: hidden;
-  padding: 0px;
-  width: 100%;
-}
-
-.chat-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  height: 100vh;
-  margin-inline: auto;
-  max-width: var(--max-width);
-  overflow-y: auto;
-  padding-block: var(--spacing-padding-x);
-  padding-inline: var(--spacing-padding-x);
-}
-.chat-list button {
-  align-items: flex-start;
-  border-radius: 8px;
-  border: 1.5px solid color-mix(in srgb, var(--color-text) 2%, transparent);
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 auto;
-  overflow: hidden;
-  padding-block: 8px;
-  padding-inline: 12px;
-  text-align: left;
-  transition: border 90ms linear;
-}
-.chat-list button:hover {
-  border-color: color-mix(in srgb, var(--color-text) 12%, transparent);
-}
-.chat-list button span:last-child {
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
-  font-size: 13px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }

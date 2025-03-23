@@ -234,41 +234,56 @@
   padding-inline: 4px;
 }
 /* code blocks */
-.content div:has(> pre) > div:first-child {
+.content [data-el="pre"] {
+  background: var(--color-bg-tertiary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-tertiary);
+  margin-inline: calc(-1 * var(--spacing-padding-x));
+}
+.content [data-el="pre"] > div {
   align-items: center;
   display: flex;
-  padding-block-end: 2px;
+  gap: 8px;
+  justify-content: space-between;
+  padding-block: 6px 0px;
+  padding-inline: var(--spacing-padding-x);
 }
-.content div:has(> pre) > div:first-child span {
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+.content [data-el="pre"] > div span {
+  color: color-mix(in srgb, var(--color-text) 67%, transparent);
   font-family: "JetBrains Mono", monospace;
   font-size: 13px;
   letter-spacing: initial;
   line-height: 1.2;
 }
-.content div:has(> pre) > div:first-child button {
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
-  margin-inline-start: -4px;
-  margin-inline-end: 2px;
-  padding: 4px;
+.content [data-el="pre"] > div button {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  letter-spacing: initial;
+  line-height: 1.2;
+  padding-block: 4px;
+  padding-inline: 0px;
   transition: color 90ms linear;
 }
-.content div:has(> pre) > div:first-child button:hover {
+.content [data-el="pre"] > div button:hover {
   color: var(--color-text);
 }
 .content pre {
   appearance: none;
-  background: color-mix(in srgb, var(--color-text) 4%, transparent) !important;
+  background: transparent !important;
   font-size: 13px;
-  margin-inline: calc(-1 * var(--spacing-padding-x));
+  line-height: 1.5;
+  margin: 0px;
   overflow-x: auto;
-  padding-block: 12px;
+  padding-block: 8px 16px;
   padding-inline: var(--spacing-padding-x);
-  position: relative;
+}
+.content pre::-webkit-scrollbar {
+  display: none;
 }
 .content pre > code {
   font-family: "JetBrains Mono", monospace;
-  font-size: 13px;
+  font-size: inherit;
   letter-spacing: initial;
-  line-height: 1.4;
+  line-height: inherit;
 }
