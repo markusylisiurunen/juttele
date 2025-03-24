@@ -90,21 +90,32 @@ type AssistantMessage struct {
 	ToolCalls []AssistantMessageToolCall `json:"tool_calls,omitempty"`
 }
 
-func NewAssistantMessage(thinking, content string) *AssistantMessage {
+func NewAssistantMessage(content string) *AssistantMessage {
 	return &AssistantMessage{
 		BaseMessage: newBaseMessage(MessageTypeAssistant),
-		Thinking:    thinking,
+		Thinking:    "",
 		Content:     content,
 	}
 }
 
+func (m *AssistantMessage) AppendThinking(thinking string) {
+	m.Thinking += thinking
+}
+
+func (m *AssistantMessage) AppendContent(content string) {
+	m.Content += content
+}
+
+func (m *AssistantMessage) ClearToolCalls() {
+	m.ToolCalls = nil
+}
+
 func (m *AssistantMessage) AppendToolCall(callID, funcName, funcArgs string) {
-	toolCall := AssistantMessageToolCall{
+	m.ToolCalls = append(m.ToolCalls, AssistantMessageToolCall{
 		CallID:   callID,
 		FuncName: funcName,
 		FuncArgs: funcArgs,
-	}
-	m.ToolCalls = append(m.ToolCalls, toolCall)
+	})
 }
 
 func (m *AssistantMessage) MarshalJSON() ([]byte, error) {
