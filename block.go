@@ -66,17 +66,24 @@ type ThinkingBlock struct {
 }
 
 func NewThinkingBlock(content string, duration int64) *ThinkingBlock {
-	return &ThinkingBlock{
-		BaseBlock: newBaseBlock(BlockTypeThinking, calculateBlockHash(content)),
+	b := &ThinkingBlock{
+		BaseBlock: newBaseBlock(BlockTypeThinking, ""),
 		Content:   content,
 		Duration:  duration,
 	}
+	b.calculateHash()
+	return b
+}
+
+func (b *ThinkingBlock) calculateHash() {
+	content := fmt.Sprintf("%s %d", b.Content, b.Duration)
+	b.Hash = calculateBlockHash(content)
 }
 
 func (b *ThinkingBlock) Update(content string, duration int64) {
 	b.Content = content
 	b.Duration = duration
-	b.Hash = calculateBlockHash(content)
+	b.calculateHash()
 }
 
 func (b *ThinkingBlock) MarshalJSON() ([]byte, error) {
@@ -91,16 +98,23 @@ type TextBlock struct {
 }
 
 func NewTextBlock(role, content string) *TextBlock {
-	return &TextBlock{
-		BaseBlock: newBaseBlock(BlockTypeText, calculateBlockHash(role+content)),
+	b := &TextBlock{
+		BaseBlock: newBaseBlock(BlockTypeText, ""),
 		Role:      role,
 		Content:   content,
 	}
+	b.calculateHash()
+	return b
+}
+
+func (b *TextBlock) calculateHash() {
+	content := b.Role + b.Content
+	b.Hash = calculateBlockHash(content)
 }
 
 func (b *TextBlock) Update(content string) {
 	b.Content = content
-	b.Hash = calculateBlockHash(b.Role + content)
+	b.calculateHash()
 }
 
 func (b *TextBlock) MarshalJSON() ([]byte, error) {
@@ -120,23 +134,36 @@ type ToolBlock struct {
 }
 
 func NewToolBlock(name, args string) *ToolBlock {
-	return &ToolBlock{
-		BaseBlock: newBaseBlock(BlockTypeTool, calculateBlockHash(name+args)),
+	b := &ToolBlock{
+		BaseBlock: newBaseBlock(BlockTypeTool, ""),
 		Name:      name,
 		Args:      args,
 	}
+	b.calculateHash()
+	return b
+}
+
+func (b *ToolBlock) calculateHash() {
+	content := b.Name + b.Args
+	if b.Result != nil {
+		content += *b.Result
+	}
+	if b.Error != nil {
+		content += fmt.Sprintf("%d %s", b.Error.Code, b.Error.Message)
+	}
+	b.Hash = calculateBlockHash(content)
 }
 
 func (b *ToolBlock) Update(name, args string) {
 	b.Name = name
 	b.Args = args
-	b.Hash = calculateBlockHash(name + args)
+	b.calculateHash()
 }
 
 func (b *ToolBlock) SetResult(result string) {
 	b.Result = &result
 	b.Error = nil
-	b.Hash = calculateBlockHash(b.Name + b.Args + result)
+	b.calculateHash()
 }
 
 func (b *ToolBlock) SetError(code int64, message string) {
@@ -148,7 +175,7 @@ func (b *ToolBlock) SetError(code int64, message string) {
 		Code:    code,
 		Message: message,
 	}
-	b.Hash = calculateBlockHash(b.Name + b.Args + fmt.Sprintf("%d%s", code, message))
+	b.calculateHash()
 }
 
 func (b *ToolBlock) MarshalJSON() ([]byte, error) {
@@ -165,8 +192,8 @@ type ErrorBlock struct {
 }
 
 func NewErrorBlock(code int64, message string) *ErrorBlock {
-	return &ErrorBlock{
-		BaseBlock: newBaseBlock(BlockTypeError, calculateBlockHash(fmt.Sprintf("%d%s", code, message))),
+	b := &ErrorBlock{
+		BaseBlock: newBaseBlock(BlockTypeError, ""),
 		Error: struct {
 			Code    int64  `json:"code"`
 			Message string `json:"message"`
@@ -175,6 +202,13 @@ func NewErrorBlock(code int64, message string) *ErrorBlock {
 			Message: message,
 		},
 	}
+	b.calculateHash()
+	return b
+}
+
+func (b *ErrorBlock) calculateHash() {
+	content := calculateBlockHash(fmt.Sprintf("%d %s", b.Error.Code, b.Error.Message))
+	b.Hash = content
 }
 
 func (b *ErrorBlock) MarshalJSON() ([]byte, error) {

@@ -24,8 +24,19 @@ const ToolComponent: React.FC<ToolComponentProps> = ({ block }) => {
   function onExpandOrCollapse() {
     setExpanded(!expanded);
   }
-  function onCopy() {
+  function onCopyArgs() {
     navigator.clipboard.writeText(args);
+  }
+  function onCopyOutput() {
+    const { error, result } = block;
+    if (error) {
+      navigator.clipboard.writeText(JSON.stringify(error));
+      return;
+    }
+    if (result) {
+      navigator.clipboard.writeText(tryOr(() => JSON.stringify(JSON.parse(result)), result));
+      return;
+    }
   }
   const label = `${name}()`;
   return (
@@ -34,7 +45,8 @@ const ToolComponent: React.FC<ToolComponentProps> = ({ block }) => {
         <span>{label}</span>
         <div className={styles.actions}>
           <button onClick={onExpandOrCollapse}>{expanded ? "collapse" : "expand"}</button>
-          <button onClick={onCopy}>copy</button>
+          <button onClick={onCopyArgs}>copy args</button>
+          <button onClick={onCopyOutput}>copy out</button>
         </div>
       </div>
       <div className={styles.content} data-expanded={expanded ? "" : undefined}>
