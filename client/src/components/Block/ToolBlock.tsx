@@ -52,8 +52,7 @@ const ToolComponent: React.FC<ToolComponentProps> = ({ block }) => {
 };
 const MemoedToolComponent = React.memo(ToolComponent, (prev, next) => {
   if (prev.block.id !== next.block.id) return false;
-  if (prev.block.name !== next.block.name) return false;
-  if (prev.block.args !== next.block.args) return false;
+  if (prev.block.hash !== next.block.hash) return false;
   return true;
 });
 

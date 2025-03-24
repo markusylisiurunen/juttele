@@ -62,7 +62,7 @@ const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ block }) => {
 };
 const MemoedThinkingComponent = React.memo(ThinkingComponent, (prev, next) => {
   if (prev.block.id !== next.block.id) return false;
-  if (prev.block.content !== next.block.content) return false;
+  if (prev.block.hash !== next.block.hash) return false;
   return true;
 });
 

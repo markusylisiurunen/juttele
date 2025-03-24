@@ -57,7 +57,7 @@ func (m *openRouterModel) StreamCompletion(
 	return streamWithTools(ctx, opts.Tools, &copied, func() <-chan Result[Message] {
 		out := make(chan Result[Message], 1)
 		defer close(out)
-		resp, err := m.request(ctx, history, opts)
+		resp, err := m.request(ctx, copied, opts)
 		if err != nil {
 			out <- Err[Message](err)
 			return out

@@ -60,8 +60,7 @@ const TextComponent: React.FC<TextComponentProps> = ({ block }) => {
 };
 const MemoedTextComponent = React.memo(TextComponent, (prev, next) => {
   if (prev.block.id !== next.block.id) return false;
-  if (prev.block.role !== next.block.role) return false;
-  if (prev.block.content !== next.block.content) return false;
+  if (prev.block.hash !== next.block.hash) return false;
   return true;
 });
 
