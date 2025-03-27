@@ -17,7 +17,7 @@
     "@tauri-apps/plugin-store": "^2.2.0",
     "classnames": "^2.5.1",
     "katex": "^0.16.21",
-    "lucide-react": "^0.483.0",
+    "lucide-react": "^0.484.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
@@ -31,11 +31,11 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.4.0",
-    "@types/react": "^18.3.19",
+    "@types/react": "^18.3.20",
     "@types/react-dom": "^18.3.5",
     "@types/use-sync-external-store": "^0.0.6",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "~5.8.2",
-    "vite": "^6.2.2"
+    "vite": "^6.2.3"
   }
 }
