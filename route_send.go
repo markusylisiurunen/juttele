@@ -22,11 +22,15 @@ type sendRequestTool struct {
 }
 
 type sendRequest struct {
-	ModelID       string            `json:"model_id"`
-	PersonalityID string            `json:"personality_id"`
-	Content       string            `json:"content"`
-	Tools         []sendRequestTool `json:"tools"`
-	UseTools      bool              `json:"use_tools"`
+	Method string `json:"method"`
+	Params struct {
+		ModelID       string            `json:"model_id"`
+		PersonalityID string            `json:"personality_id"`
+		Content       string            `json:"content"`
+		Tools         []sendRequestTool `json:"tools"`
+		UseTools      bool              `json:"use_tools"`
+		Think         bool              `json:"think"`
+	} `json:"params"`
 }
 
 var upgrader = websocket.Upgrader{
@@ -73,33 +77,37 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		writeWSError(proxy, "error decoding request", err)
 		return
 	}
-	if chatID <= 0 || v.ModelID == "" || v.PersonalityID == "" || v.Content == "" {
+	if v.Method != "generate" {
+		writeWSError(proxy, "invalid method", nil)
+		return
+	}
+	if chatID <= 0 || v.Params.ModelID == "" || v.Params.PersonalityID == "" || v.Params.Content == "" {
 		writeWSError(proxy, "chat ID, model ID, personality ID, and content must be provided", nil)
 		return
 	}
-	modelIdx := slices.IndexFunc(app.models, func(model Model) bool { return model.GetModelInfo().ID == v.ModelID })
+	modelIdx := slices.IndexFunc(app.models, func(model Model) bool { return model.GetModelInfo().ID == v.Params.ModelID })
 	if modelIdx == -1 {
-		writeWSError(proxy, fmt.Sprintf("model with ID %q not found", v.ModelID), nil)
+		writeWSError(proxy, fmt.Sprintf("model with ID %q not found", v.Params.ModelID), nil)
 		return
 	}
 	model := app.models[modelIdx]
 	var systemPrompt *string
 	for _, i := range model.GetModelInfo().Personalities {
-		if i.ID == v.PersonalityID {
+		if i.ID == v.Params.PersonalityID {
 			v := i.SystemPrompt
 			systemPrompt = &v
 			break
 		}
 	}
 	if systemPrompt == nil {
-		writeWSError(proxy, fmt.Sprintf("personality with ID %q not found", v.PersonalityID), nil)
+		writeWSError(proxy, fmt.Sprintf("personality with ID %q not found", v.Params.PersonalityID), nil)
 		return
 	}
-	if err := app.upsertMessage(ctx, chatID, NewUserMessage(v.Content)); err != nil {
+	if err := app.upsertMessage(ctx, chatID, NewUserMessage(v.Params.Content)); err != nil {
 		writeWSError(proxy, "error upserting user message", err)
 		return
 	}
-	if err := app.upsertBlock(ctx, chatID, NewTextBlock("user", v.Content)); err != nil {
+	if err := app.upsertBlock(ctx, chatID, NewTextBlock("user", v.Params.Content)); err != nil {
 		writeWSError(proxy, "error upserting user block", err)
 		return
 	}
@@ -121,15 +129,16 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		history = append(history, message)
 	}
-	history = append(history, NewUserMessage(v.Content))
+	// history = append(history, NewUserMessage(v.Content))
 	opts := GenerationConfig{
 		Tools: NewToolCatalog(),
+		Think: v.Params.Think,
 	}
-	if v.UseTools {
+	if v.Params.UseTools {
 		for _, j := range app.tools {
 			opts.Tools.Register(j)
 		}
-		for _, j := range v.Tools {
+		for _, j := range v.Params.Tools {
 			opts.Tools.Register(newClientTool(proxy, j.Name, j.Spec))
 		}
 	}

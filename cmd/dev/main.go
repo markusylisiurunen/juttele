@@ -16,15 +16,15 @@ var rawSystemPrompt string
 
 func main() {
 	var (
-		anthropicToken  = os.Getenv("ANTHROPIC_TOKEN")
-		deepSeekToken   = os.Getenv("DEEPSEEK_TOKEN")
-		googleToken     = os.Getenv("GOOGLE_TOKEN")
-		groqToken       = os.Getenv("GROQ_TOKEN")
+		anthropicToken = os.Getenv("ANTHROPIC_TOKEN")
+		deepSeekToken  = os.Getenv("DEEPSEEK_TOKEN")
+		// googleToken     = os.Getenv("GOOGLE_TOKEN")
+		// groqToken       = os.Getenv("GROQ_TOKEN")
 		openRouterToken = os.Getenv("OPEN_ROUTER_TOKEN")
 	)
 	app := juttele.New("YOUR_TOKEN_HERE",
 		juttele.WithModel(
-			juttele.NewAnthropicModel(anthropicToken, "claude-3-7-sonnet-20250219", false,
+			juttele.NewAnthropicModel(anthropicToken, "claude-3-7-sonnet-20250219",
 				juttele.WithDisplayName("Claude 3.7 Sonnet"),
 				juttele.WithMaxTokens(16384),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
@@ -32,17 +32,9 @@ func main() {
 			),
 		),
 		juttele.WithModel(
-			juttele.NewAnthropicModel(anthropicToken, "claude-3-7-sonnet-20250219", true,
-				juttele.WithDisplayName("Claude 3.7 Sonnet (thinking)"),
-				juttele.WithMaxTokens(16384),
-				juttele.WithPersonality("Raw", rawSystemPrompt),
-				juttele.WithTemperature(1.0),
-			),
-		),
-		juttele.WithModel(
-			juttele.NewAnthropicModel(anthropicToken, "claude-3-5-sonnet-20241022", false,
+			juttele.NewAnthropicModel(anthropicToken, "claude-3-5-sonnet-20241022",
 				juttele.WithDisplayName("Claude 3.5 Sonnet"),
-				juttele.WithMaxTokens(8192),
+				juttele.WithMaxTokens(16384),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
 				juttele.WithTemperature(0.7),
 			),
@@ -52,36 +44,36 @@ func main() {
 				juttele.WithDisplayName("DeepSeek R1"),
 				juttele.WithMaxTokens(8192),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
-				juttele.WithTemperature(0.6),
+				juttele.WithTemperature(1.0),
+			),
+		),
+		juttele.WithModel(
+			juttele.NewDeepSeekModel(deepSeekToken, "deepseek-chat",
+				juttele.WithDisplayName("DeepSeek V3"),
+				juttele.WithMaxTokens(8192),
+				juttele.WithPersonality("Raw", rawSystemPrompt),
+				juttele.WithTemperature(1.3),
+			),
+		),
+		juttele.WithModel(
+			juttele.NewOpenRouterModel(openRouterToken, "google/gemini-2.5-pro-exp-03-25:free", []string{"Google AI Studio"},
+				juttele.WithDisplayName("Gemini 2.5 Pro"),
+				juttele.WithMaxTokens(16384),
+				juttele.WithPersonality("Raw", rawSystemPrompt),
+				juttele.WithTemperature(1.0),
+			),
+		),
+		juttele.WithModel(
+			juttele.NewOpenRouterModel(openRouterToken, "google/gemini-2.0-flash-001", []string{"Google AI Studio"},
+				juttele.WithDisplayName("Gemini 2.0 Flash"),
+				juttele.WithMaxTokens(16384),
+				juttele.WithPersonality("Raw", rawSystemPrompt),
+				juttele.WithTemperature(1.0),
 			),
 		),
 		juttele.WithModel(
 			juttele.NewOpenRouterModel(openRouterToken, "openai/gpt-4o-2024-11-20", nil,
 				juttele.WithDisplayName("GPT-4o"),
-				juttele.WithMaxTokens(16384),
-				juttele.WithPersonality("Raw", rawSystemPrompt),
-				juttele.WithTemperature(0.7),
-			),
-		),
-		juttele.WithModel(
-			juttele.NewOpenRouterModel(openRouterToken, "openai/o3-mini-high", nil,
-				juttele.WithDisplayName("o3-mini (high)"),
-				juttele.WithMaxTokens(16384),
-				juttele.WithPersonality("Raw", rawSystemPrompt),
-				juttele.WithTemperature(0.7),
-			),
-		),
-		juttele.WithModel(
-			juttele.NewGroqModel(groqToken, "deepseek-r1-distill-llama-70b",
-				juttele.WithDisplayName("DeepSeek R1 (Llama 70B)"),
-				juttele.WithMaxTokens(8192),
-				juttele.WithPersonality("Raw", rawSystemPrompt),
-				juttele.WithTemperature(0.6),
-			),
-		),
-		juttele.WithModel(
-			juttele.NewGoogleModel(googleToken, "gemini-2.0-flash-thinking-exp",
-				juttele.WithDisplayName("Gemini 2.0 Flash Thinking"),
 				juttele.WithMaxTokens(8192),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
 				juttele.WithTemperature(1.0),

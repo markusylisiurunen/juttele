@@ -117,6 +117,7 @@ func (app *App) initRoutes(ctx context.Context) error {
 		handler http.HandlerFunc
 	}
 	mountables := []mountable{
+		{"POST /api", app.apiRouteHandler},
 		{"GET /config", app.configRouteHandler},
 		{"GET /data", app.dataRouteHandler},
 		{"POST /rpc", app.rpcRouteHandler},
