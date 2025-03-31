@@ -12,7 +12,6 @@ import { assertNever, Atom, streamCompletion, useAtomWithSelector } from "./util
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const API_KEY = import.meta.env.VITE_API_KEY;
-const FS_BASE_DIR = import.meta.env.VITE_FS_BASE_DIR;
 
 function upsertBlock(dataAtom: Atom<DataResponse>, chatId: number, block: AnyBlock) {
   dataAtom.set((data) => {
@@ -55,6 +54,7 @@ const App: React.FC<AppProps> = ({ chatId, onShowChats, onReset }) => {
       });
       // stream the completion
       try {
+        const baseFileSystemPath = app.settings.get().baseFileSystemPath;
         app.generation.set((state) => ({ ...state, generating: true }));
         await streamCompletion(
           BASE_URL,
@@ -66,9 +66,13 @@ const App: React.FC<AppProps> = ({ chatId, onShowChats, onReset }) => {
           think,
           message,
           [
-            makeListFilesTool(FS_BASE_DIR),
-            makeReadFileTool(FS_BASE_DIR),
-            makeWriteFileTool(FS_BASE_DIR),
+            ...(baseFileSystemPath
+              ? [
+                  makeListFilesTool(baseFileSystemPath),
+                  makeReadFileTool(baseFileSystemPath),
+                  makeWriteFileTool(baseFileSystemPath),
+                ]
+              : []),
           ],
           (msg) => {
             if (msg.method === "block") {

@@ -5,12 +5,13 @@
   --color-bg: lch(3.2% 0.5 64);
   --color-border-glow: lch(20% 16 64);
   --color-border-secondary: lch(9.6% 1 64);
-  --color-border-tertiary: lch(7.2% 1 64);
   --color-border-soft: lch(6.4% 0 0);
+  --color-border-tertiary: lch(7.2% 1 64);
   --color-border: lch(20% 0 0);
   --color-text-glow: lch(88% 24 64);
   --color-text-link: lch(82% 108 298);
   --color-text-placeholder: lch(42% 2 64);
+  --color-text-secondary: lch(82% 2 64);
   --color-text: lch(96% 2 64);
   --max-width: 680px;
   --spacing-padding-x: 12px;

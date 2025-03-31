@@ -1,5 +1,4 @@
 import classNames from "classnames";
-// import { type IconName } from "lucide-react/dynamic";
 import React, { useEffect, useState } from "react";
 import styles from "./Select.module.css";
 

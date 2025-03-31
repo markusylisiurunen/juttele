@@ -1,10 +1,12 @@
-import { ArrowUp, ChevronDown, Lightbulb, Parentheses } from "lucide-react";
+import { ArrowUp, ChevronDown, Lightbulb, Parentheses, Settings2 } from "lucide-react";
 import React from "react";
 import { useApp } from "../../../hooks";
 import { useAtomWithSelector } from "../../../utils";
 import { Button } from "../../Button/Button";
+import { Dialog } from "../../Dialog/Dialog";
 import { Select } from "../../Select/Select";
 import styles from "./Actions.module.css";
+import { Config } from "./Config";
 
 type ModelPickerProps = {
   modelId: string;
@@ -20,6 +22,12 @@ const ModelPicker: React.FC<ModelPickerProps> = ({ modelId, personalityId, onCha
   }
   return (
     <div className={styles.modelPicker}>
+      <Dialog
+        title="Config"
+        trigger={<Button iconLeft={<Settings2 size={13} strokeWidth={2.5} />} />}
+      >
+        <Config />
+      </Dialog>
       <Select
         value={modelId}
         options={models.map((model) => ({
@@ -52,13 +60,13 @@ const GenerationConfig: React.FC<GenerationConfigProps> = ({ tools, think, onCha
     <div className={styles.generationConfig}>
       <Button
         glowing={tools}
-        label="Tools"
+        label="tools"
         iconLeft={<Parentheses size={13} strokeWidth={2.5} />}
         onClick={() => onChange(!tools, think)}
       />
       <Button
         glowing={think}
-        label="Think"
+        label="think"
         iconLeft={<Lightbulb size={13} strokeWidth={2.5} />}
         onClick={() => onChange(tools, !think)}
       />

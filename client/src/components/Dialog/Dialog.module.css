@@ -1,0 +1,20 @@
+.overlay {
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  inset: 0;
+  position: fixed;
+}
+.content {
+  background: var(--color-bg-tertiary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-tertiary);
+  left: 50%;
+  max-height: 75vh;
+  max-width: 560px;
+  position: fixed;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100vw - 2 * var(--spacing-padding-x));
+}
+.content:focus {
+  outline: none;
+}

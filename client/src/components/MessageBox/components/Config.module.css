@@ -1,0 +1,41 @@
+.root {
+  padding-block: 0px 16px;
+  padding-inline: 16px;
+}
+.root h2 {
+  font-size: 16px;
+  font-weight: 500;
+  margin-block: 12px;
+  margin-inline: 0px;
+}
+.root hr {
+  border: none;
+}
+.root hr {
+  border-top: 1px solid var(--color-border-secondary);
+  height: 0px;
+  margin-block: 12px 16px;
+  margin-inline: 0px;
+}
+.root p {
+  color: var(--color-text-secondary);
+  margin-block: 12px;
+  margin-inline: 0px;
+}
+.root input {
+  appearance: none;
+  background: transparent;
+  border-radius: 5px;
+  border: 1px solid var(--color-border);
+  display: block;
+  font-size: inherit;
+  font-weight: 400;
+  height: 40px;
+  outline: none;
+  padding-block: 0px;
+  padding-inline: 12px;
+  width: 100%;
+}
+.root input::placeholder {
+  color: var(--color-text-placeholder);
+}

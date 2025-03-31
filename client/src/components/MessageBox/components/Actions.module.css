@@ -16,6 +16,19 @@
   display: flex;
   gap: 6px;
 }
+.modelPicker > button:first-child {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  gap: 3px;
+  height: 24px;
+  justify-content: center;
+  padding: 0px;
+}
+.modelPicker > button:first-child svg {
+  opacity: 1;
+}
 .generationConfig {
   align-items: center;
   display: flex;
