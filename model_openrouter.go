@@ -52,6 +52,14 @@ func (m *openRouterModel) GetModelInfo() ModelInfo {
 func (m *openRouterModel) StreamCompletion(
 	ctx context.Context, history []Message, opts GenerationConfig,
 ) <-chan Result[Message] {
+	if opts.Think {
+		if opts.Tools == nil {
+			opts.Tools = NewToolCatalog()
+		} else {
+			opts.Tools = opts.Tools.Copy()
+		}
+		m.injectThinkTool(opts.Tools)
+	}
 	copied := make([]Message, len(history))
 	copy(copied, history)
 	return streamWithTools(ctx, opts.Tools, &copied, func() <-chan Result[Message] {
@@ -64,6 +72,30 @@ func (m *openRouterModel) StreamCompletion(
 		}
 		return streamOpenAI(resp)
 	})
+}
+
+func (m *openRouterModel) injectThinkTool(tools *ToolCatalog) {
+	var spec = `
+{
+	"name": "think",
+	"description": "Use the tool to think about something. It will not obtain new information or make any changes to the repository, but just log the thought. Use it when complex reasoning or brainstorming is needed. For example, if you explore the repo and discover the source of a bug, call this tool to brainstorm several unique ways of fixing the bug, and assess which change(s) are likely to be simplest and most effective. Alternatively, if you receive some test results, call this tool to brainstorm ways to fix the failing tests.",
+	"parameters": {
+		"type": "object",
+		"properties": {
+			"thought": {
+				"type": "string",
+				"description": "Your thoughts."
+			}
+		},
+		"required": ["thought"]
+	}
+}
+	`
+	tools.Register(newFuncTool(
+		"think",
+		[]byte(strings.TrimSpace(spec)),
+		func(ctx context.Context, args string) (string, error) { return "", nil },
+	))
 }
 
 func (m *openRouterModel) request(
@@ -121,9 +153,13 @@ func (m *openRouterModel) request(
 	}
 	if opts.Tools != nil && opts.Tools.Count() > 0 {
 		for _, t := range opts.Tools.List() {
+			spec, err := m.spec(t.Spec())
+			if err != nil {
+				return nil, err
+			}
 			b.Tools = append(b.Tools, reqBody_tool{
 				Type:     "function",
-				Function: t.Spec(),
+				Function: spec,
 			})
 		}
 	}
@@ -203,4 +239,51 @@ func (m *openRouterModel) request(
 		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, body)
 	}
 	return resp, nil
+}
+
+func (m *openRouterModel) spec(spec []byte) ([]byte, error) {
+	if strings.HasPrefix(m.modelName, "google/") {
+		return m.specGoogle(spec)
+	}
+	return spec, nil
+}
+
+func (m *openRouterModel) specGoogle(spec []byte) ([]byte, error) {
+	type OpenAIToolSpec struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Parameters  struct {
+			Type       string `json:"type"`
+			Properties map[string]struct {
+				Type        string `json:"type"`
+				Description string `json:"description"`
+			} `json:"properties"`
+			Required             []string `json:"required"`
+			AdditionalProperties bool     `json:"additionalProperties"`
+		} `json:"parameters"`
+	}
+	type GoogleToolSpec struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Parameters  *struct {
+			Type       string `json:"type"`
+			Properties map[string]struct {
+				Type        string `json:"type"`
+				Description string `json:"description"`
+			} `json:"properties"`
+			Required             []string `json:"required"`
+			AdditionalProperties bool     `json:"additionalProperties"`
+		} `json:"parameters,omitempty"`
+	}
+	var openAITool OpenAIToolSpec
+	if err := json.Unmarshal(spec, &openAITool); err != nil {
+		return nil, err
+	}
+	var googleTool GoogleToolSpec
+	googleTool.Name = openAITool.Name
+	googleTool.Description = openAITool.Description
+	if openAITool.Parameters.Type == "object" && len(openAITool.Parameters.Properties) > 0 {
+		googleTool.Parameters = &openAITool.Parameters
+	}
+	return json.Marshal(googleTool)
 }

@@ -45,8 +45,7 @@ func (m *apiKeyToolBundle) createAPIKey() Tool {
 		},
 		"required": [],
 		"additionalProperties": false
-	},
-	"strict": true
+	}
 }
 	`
 	return newFuncTool(

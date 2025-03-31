@@ -53,12 +53,16 @@ func (m *anthropicModel) StreamCompletion(
 ) <-chan Result[Message] {
 	out := make(chan Result[Message], 1)
 	defer close(out)
+	if opts.Think {
+		if opts.Tools == nil {
+			opts.Tools = NewToolCatalog()
+		} else {
+			opts.Tools = opts.Tools.Copy()
+		}
+		m.injectThinkTool(opts.Tools)
+	}
 	if opts.Tools != nil && opts.Tools.Count() > 0 && opts.Think {
 		out <- Err[Message](errors.New("tools cannot be used with extended thinking for now"))
-		return out
-	}
-	if opts.Think && !m.isThinkingModel() {
-		out <- Err[Message](errors.New("extended thinking is not supported with this model"))
 		return out
 	}
 	copied := make([]Message, len(history))
@@ -77,6 +81,30 @@ func (m *anthropicModel) StreamCompletion(
 
 func (m *anthropicModel) isThinkingModel() bool {
 	return strings.Contains(m.modelName, "claude-3-7-sonnet")
+}
+
+func (m *anthropicModel) injectThinkTool(tools *ToolCatalog) {
+	var spec = `
+{
+	"name": "think",
+	"description": "Use the tool to think about something. It will not obtain new information or make any changes to the repository, but just log the thought. Use it when complex reasoning or brainstorming is needed. For example, if you explore the repo and discover the source of a bug, call this tool to brainstorm several unique ways of fixing the bug, and assess which change(s) are likely to be simplest and most effective. Alternatively, if you receive some test results, call this tool to brainstorm ways to fix the failing tests.",
+	"parameters": {
+		"type": "object",
+		"properties": {
+			"thought": {
+				"type": "string",
+				"description": "Your thoughts."
+			}
+		},
+		"required": ["thought"]
+	}
+}
+	`
+	tools.Register(newFuncTool(
+		"think",
+		[]byte(strings.TrimSpace(spec)),
+		func(ctx context.Context, args string) (string, error) { return "", nil },
+	))
 }
 
 func (m *anthropicModel) request(
@@ -128,7 +156,7 @@ func (m *anthropicModel) request(
 	if opts.Temperature != nil {
 		b.Temperature = *opts.Temperature
 	}
-	if opts.Think {
+	if opts.Think && m.isThinkingModel() {
 		b.Temperature = 1.0 // NOTE: Anthropic does not support temperature for extended thinking
 		b.Thinking = &reqBody_thinking{
 			Type:         "enabled",

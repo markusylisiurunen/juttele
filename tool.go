@@ -22,6 +22,16 @@ func NewToolCatalog() *ToolCatalog {
 	return &ToolCatalog{tools: make(map[string]Tool), order: make([]string, 0)}
 }
 
+func (tc *ToolCatalog) Copy() *ToolCatalog {
+	tc.mux.RLock()
+	defer tc.mux.RUnlock()
+	out := NewToolCatalog()
+	for _, name := range tc.order {
+		out.Register(tc.tools[name])
+	}
+	return out
+}
+
 func (tc *ToolCatalog) Register(tool Tool) error {
 	tc.mux.Lock()
 	defer tc.mux.Unlock()

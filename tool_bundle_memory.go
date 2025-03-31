@@ -45,8 +45,7 @@ func (m *memoryToolBundle) listMemoriesTool() Tool {
 		"properties": {},
 		"required": [],
 		"additionalProperties": false
-	},
-	"strict": true
+	}
 }
 	`
 	return newFuncTool(
@@ -101,8 +100,7 @@ func (m *memoryToolBundle) saveMemoryTool() Tool {
 		},
 		"required": ["content"],
 		"additionalProperties": false
-	},
-	"strict": true
+	}
 }
 	`
 	return newFuncTool(
@@ -154,8 +152,7 @@ func (m *memoryToolBundle) updateMemoryTool() Tool {
 		},
 		"required": ["id", "content"],
 		"additionalProperties": false
-	},
-	"strict": true
+	}
 }
 	`
 	return newFuncTool(
@@ -202,8 +199,7 @@ func (m *memoryToolBundle) deleteMemoryTool() Tool {
 		},
 		"required": ["id"],
 		"additionalProperties": false
-	},
-	"strict": true
+	}
 }
 	`
 	return newFuncTool(

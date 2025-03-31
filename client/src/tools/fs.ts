@@ -19,7 +19,6 @@ function makeListFilesTool(baseDir: string): Tool {
         required: [],
         additionalProperties: false,
       },
-      strict: true,
     },
     Call: async () => {
       await assertGitRoot(baseDir);
@@ -52,7 +51,6 @@ function makeReadFileTool(baseDir: string): Tool {
         required: ["file_path"],
         additionalProperties: false,
       },
-      strict: true,
     },
     Call: async (args) => {
       let filePath: string;
@@ -95,7 +93,6 @@ function makeWriteFileTool(baseDir: string): Tool {
         required: ["file_path", "content"],
         additionalProperties: false,
       },
-      strict: true,
     },
     Call: async (args) => {
       let filePath: string;
