@@ -3,7 +3,61 @@ package juttele
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"sync"
+	"time"
 )
+
+type ToolBundle interface {
+	Tools() []Tool
+}
+
+type ToolCatalog struct {
+	mux   sync.RWMutex
+	tools map[string]Tool
+	order []string
+}
+
+func NewToolCatalog() *ToolCatalog {
+	return &ToolCatalog{tools: make(map[string]Tool), order: make([]string, 0)}
+}
+
+func (tc *ToolCatalog) Register(tool Tool) error {
+	tc.mux.Lock()
+	defer tc.mux.Unlock()
+	if _, ok := tc.tools[tool.Name()]; ok {
+		return fmt.Errorf("tool %q already registered", tool.Name())
+	}
+	tc.tools[tool.Name()] = tool
+	tc.order = append(tc.order, tool.Name())
+	return nil
+}
+
+func (tc *ToolCatalog) Count() int {
+	tc.mux.RLock()
+	defer tc.mux.RUnlock()
+	return len(tc.tools)
+}
+
+func (tc *ToolCatalog) List() []Tool {
+	tc.mux.RLock()
+	defer tc.mux.RUnlock()
+	out := make([]Tool, 0, len(tc.tools))
+	for _, name := range tc.order {
+		out = append(out, tc.tools[name])
+	}
+	return out
+}
+
+func (tc *ToolCatalog) Call(ctx context.Context, name, args string) (string, error) {
+	tc.mux.RLock()
+	tool, ok := tc.tools[name]
+	tc.mux.RUnlock()
+	if !ok {
+		return "", fmt.Errorf("tool %q not found", name)
+	}
+	return tool.Call(ctx, args)
+}
 
 type Tool interface {
 	Name() string
@@ -11,79 +65,64 @@ type Tool interface {
 	Call(context.Context, string) (string, error)
 }
 
-//---
-
-func toAnthropicToolSpec(spec []byte) ([]byte, error) {
-	type OpenAIToolSpec struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		Parameters  struct {
-			Type       string `json:"type"`
-			Properties map[string]struct {
-				Type        string `json:"type"`
-				Description string `json:"description"`
-			} `json:"properties"`
-			Required             []string `json:"required"`
-			AdditionalProperties bool     `json:"additionalProperties"`
-		} `json:"parameters"`
-	}
-	type AnthropicToolSpec struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		InputSchema struct {
-			Type       string `json:"type"`
-			Properties map[string]struct {
-				Type        string `json:"type"`
-				Description string `json:"description"`
-			} `json:"properties"`
-			Required []string `json:"required"`
-		} `json:"input_schema"`
-	}
-	var openAITool OpenAIToolSpec
-	if err := json.Unmarshal(spec, &openAITool); err != nil {
-		return nil, err
-	}
-	var anthropicTool AnthropicToolSpec
-	anthropicTool.Name = openAITool.Name
-	anthropicTool.Description = openAITool.Description
-	anthropicTool.InputSchema.Type = openAITool.Parameters.Type
-	anthropicTool.InputSchema.Properties = make(map[string]struct {
-		Type        string `json:"type"`
-		Description string `json:"description"`
-	})
-	for k, v := range openAITool.Parameters.Properties {
-		anthropicTool.InputSchema.Properties[k] = struct {
-			Type        string `json:"type"`
-			Description string `json:"description"`
-		}{
-			Type:        v.Type,
-			Description: v.Description,
-		}
-	}
-	anthropicTool.InputSchema.Required = openAITool.Parameters.Required
-	return json.Marshal(anthropicTool)
-}
-
-//---
-
 type funcTool struct {
 	name string
 	spec []byte
 	fn   func(context.Context, string) (string, error)
 }
 
-func NewFuncTool(name string, spec []byte, fn func(context.Context, string) (string, error)) Tool {
+func newFuncTool(name string, spec []byte, fn func(context.Context, string) (string, error)) Tool {
 	return &funcTool{name: name, spec: spec, fn: fn}
 }
 
-func (f *funcTool) Name() string {
-	return f.name
+func (r *funcTool) Name() string {
+	return r.name
 }
 
-func (f *funcTool) Spec() []byte {
-	return f.spec
+func (r *funcTool) Spec() []byte {
+	return r.spec
 }
 
-func (f *funcTool) Call(ctx context.Context, input string) (string, error) {
-	return f.fn(ctx, input)
+func (r *funcTool) Call(ctx context.Context, args string) (string, error) {
+	return r.fn(ctx, args)
+}
+
+type clientTool struct {
+	proxy *webSocketProxy
+	name  string
+	spec  []byte
+}
+
+func newClientTool(proxy *webSocketProxy, name string, spec []byte) Tool {
+	return &clientTool{proxy: proxy, name: name, spec: spec}
+}
+
+func (r *clientTool) Name() string {
+	return r.name
+}
+
+func (r *clientTool) Spec() []byte {
+	return r.spec
+}
+
+func (r *clientTool) Call(ctx context.Context, args string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	type request struct {
+		Name string `json:"name"`
+		Args string `json:"args"`
+	}
+	req, err := json.Marshal(request{Name: r.name, Args: args})
+	if err != nil {
+		return "", err
+	}
+	res, err := r.proxy.rpc(ctx, "tool_call", req)
+	if err != nil {
+		return "", err
+	}
+	var v string
+	if err := json.Unmarshal(res, &v); err != nil {
+		return "", err
+	}
+	return v, nil
 }

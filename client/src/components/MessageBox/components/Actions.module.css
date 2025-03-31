@@ -1,0 +1,40 @@
+.root {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding-block: 4px 8px;
+  padding-inline: 12px;
+}
+.generationConfigAndSend {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+.modelPicker {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+.generationConfig {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+.generationConfig button {
+  font-size: 13px;
+  font-weight: 500;
+  height: 24px;
+  line-height: 1;
+}
+.sendButton {
+  align-items: center;
+  background: var(--color-text);
+  border-radius: 50%;
+  color: var(--color-bg);
+  cursor: pointer;
+  display: flex;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AnyBlock } from "../blocks";
 
 const ConfigResponse = z.object({
   models: z.array(
@@ -20,36 +21,9 @@ const DataResponse = z.object({
   chats: z.array(
     z.object({
       id: z.number(),
-      created_at: z.string().datetime(),
+      ts: z.string().datetime(),
       title: z.string(),
-      history: z.array(
-        z.union([
-          z.object({
-            kind: z.literal("message"),
-            data: z.object({
-              role: z.union([z.literal("assistant"), z.literal("tool"), z.literal("user")]),
-              content: z.string(),
-              tool_calls: z
-                .array(
-                  z.object({
-                    id: z.string(),
-                    function: z.object({
-                      name: z.string(),
-                      arguments: z.string(),
-                    }),
-                  })
-                )
-                .optional(),
-            }),
-          }),
-          z.object({
-            kind: z.literal("reasoning"),
-            data: z.object({
-              content: z.string(),
-            }),
-          }),
-        ])
-      ),
+      blocks: z.array(AnyBlock),
     })
   ),
 });

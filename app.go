@@ -21,6 +21,7 @@ type App struct {
 	repo   *repo.Repository
 	router *http.ServeMux
 	models []Model
+	tools  []Tool
 }
 
 type appOption func(*App)
@@ -37,12 +38,19 @@ func WithModel(model Model) appOption {
 	}
 }
 
+func WithToolBundle(tools ToolBundle) appOption {
+	return func(app *App) {
+		app.tools = append(app.tools, tools.Tools()...)
+	}
+}
+
 func New(token string, opts ...appOption) *App {
 	app := new(App)
 	app.configDataFolder = "./.data"
 	app.configToken = token
 	app.router = http.NewServeMux()
 	app.models = make([]Model, 0)
+	app.tools = make([]Tool, 0)
 	for _, opt := range opts {
 		opt(app)
 	}
@@ -109,13 +117,22 @@ func (app *App) initRoutes(ctx context.Context) error {
 		handler http.HandlerFunc
 	}
 	mountables := []mountable{
+		{"GET /api/models", app.apiModelsRouteHandler},
+		{"POST /api/generate", app.apiGenerateRouteHandler},
+
 		{"GET /config", app.configRouteHandler},
 		{"GET /data", app.dataRouteHandler},
 		{"POST /rpc", app.rpcRouteHandler},
 		{"GET /chats/{id}", app.sendRouteHandler},
 	}
 	for _, i := range mountables {
-		app.router.Handle(i.pattern, middleware.Auth(app.configToken)(i.handler))
+		app.router.Handle(i.pattern,
+			middleware.Log()(
+				middleware.Auth(app.repo, app.configToken)(
+					i.handler,
+				),
+			),
+		)
 	}
 	return nil
 }

@@ -1,0 +1,22 @@
+.textarea {
+  appearance: none;
+  background: none;
+  border-radius: 0px;
+  border: none;
+  color: inherit;
+  display: block;
+  font-size: inherit;
+  height: calc(3 * 1.5em + 12px + 8px);
+  line-height: 1.5em;
+  outline: none;
+  padding-block: 12px 8px;
+  padding-inline: 12px;
+  resize: none;
+  width: 100%;
+}
+.textarea::-webkit-scrollbar {
+  display: none;
+}
+.textarea::placeholder {
+  color: var(--color-text-placeholder);
+}

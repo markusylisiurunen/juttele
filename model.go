@@ -1,14 +1,10 @@
 package juttele
 
 import (
-	"bufio"
 	"context"
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
-	"strings"
+	"strconv"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/markusylisiurunen/juttele/internal/util"
 )
 
@@ -24,99 +20,65 @@ type ModelInfo struct {
 	Personalities []ModelPersonality
 }
 
-type CompletionOpts struct {
-	UseTools    bool
-	ClientTools []Tool
+type GenerationConfig struct {
+	Temperature *float64
+	Think       bool
+	Tools       *ToolCatalog
 }
 
 type Model interface {
 	GetModelInfo() ModelInfo
-	StreamCompletion(ctx context.Context, systemPrompt string, history []ChatEvent, opts CompletionOpts) <-chan ChatEvent
+	StreamCompletion(context.Context, []Message, GenerationConfig) <-chan Result[Message]
 }
 
-func callOpenAICompatibleAPI(
-	ctx context.Context,
-	sendRequest func(context.Context) (*http.Response, error),
-) <-chan util.Result[[]byte] {
-	out, _ := util.SafeGo(ctx, func(ctx context.Context, vs chan<- []byte, errs chan<- error) {
-		resp, err := sendRequest(ctx)
-		if err != nil {
-			errs <- fmt.Errorf("request error: %w", err)
-			return
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			errs <- fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-			return
-		}
-		reader := bufio.NewReader(resp.Body)
-		for {
-			line, err := reader.ReadString('\n')
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					return
-				}
-				errs <- fmt.Errorf("read error: %w", err)
-				return
-			}
-			if !strings.HasPrefix(line, "data: ") {
-				continue
-			}
-			line = strings.TrimSpace(strings.TrimPrefix(line, "data: "))
-			if line == "[DONE]" {
-				continue
-			}
-			vs <- []byte(line)
-		}
-	})
-	return out
+type model struct {
+	displayName   string
+	maxTokens     int64
+	personalities []ModelPersonality
+	temperature   float64
 }
 
-func callAnySSEAPI(
-	ctx context.Context,
-	sendRequest func(context.Context) (*http.Response, error),
-) <-chan util.Result[util.Tuple[string, []byte]] {
-	out, _ := util.SafeGo(ctx, func(ctx context.Context, vs chan<- util.Tuple[string, []byte], errs chan<- error) {
-		resp, err := sendRequest(ctx)
-		if err != nil {
-			errs <- fmt.Errorf("request error: %w", err)
-			return
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			errs <- fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
-			return
-		}
-		var event *string
-		reader := bufio.NewReader(resp.Body)
-		for {
-			line, err := reader.ReadString('\n')
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					return
-				}
-				errs <- fmt.Errorf("read error: %w", err)
-				return
-			}
-			if strings.HasPrefix(line, "event: ") {
-				line = strings.TrimSpace(strings.TrimPrefix(line, "event: "))
-				event = &line
-				continue
-			}
-			if event != nil {
-				if strings.HasPrefix(line, "data: ") {
-					line = strings.TrimSpace(strings.TrimPrefix(line, "data: "))
-					vs <- util.NewTuple(*event, []byte(line))
-				}
-				event = nil
-			} else {
-				if strings.HasPrefix(line, "data: ") {
-					line = strings.TrimSpace(strings.TrimPrefix(line, "data: "))
-					vs <- util.NewTuple("", []byte(line))
-				}
-			}
-		}
-	})
-	return out
+func (m *model) getModelInfo(id string) ModelInfo {
+	personalities := make([]ModelPersonality, len(m.personalities))
+	copy(personalities, m.personalities)
+	for i := range personalities {
+		pid := xxhash.New()
+		util.Must(pid.WriteString(id))
+		util.Must(pid.WriteString(personalities[i].Name))
+		personalities[i].ID = strconv.FormatUint(pid.Sum64(), 10)
+	}
+	return ModelInfo{
+		ID:            id,
+		Name:          m.displayName,
+		Personalities: personalities,
+	}
+}
+
+type modelOption func(*model)
+
+func WithDisplayName(displayName string) modelOption {
+	return func(m *model) {
+		m.displayName = displayName
+	}
+}
+
+func WithMaxTokens(maxTokens int64) modelOption {
+	return func(m *model) {
+		m.maxTokens = maxTokens
+	}
+}
+
+func WithTemperature(temperature float64) modelOption {
+	return func(m *model) {
+		m.temperature = temperature
+	}
+}
+
+func WithPersonality(name, systemPrompt string) modelOption {
+	return func(m *model) {
+		m.personalities = append(m.personalities, ModelPersonality{
+			Name:         name,
+			SystemPrompt: systemPrompt,
+		})
+	}
 }

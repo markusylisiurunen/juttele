@@ -1,52 +1,68 @@
-import { BrainIcon, CheckIcon, CopyIcon } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ThinkingBlock } from "../../blocks";
-import styles from "./Thinking.module.css";
+import { useBlock } from "../../hooks";
+import styles from "./ThinkingBlock.module.css";
+
+function useSeconds() {
+  const { isActive } = useBlock();
+  const start = useRef(Date.now());
+  const [duration, setDuration] = useState(0);
+  useEffect(() => {
+    if (!isActive) return;
+    let _duration = 0;
+    const interval = setInterval(() => {
+      const next = Date.now() - start.current;
+      if (Math.floor(next / 1000) !== Math.floor(_duration / 1000)) {
+        _duration = next;
+        setDuration(next);
+      }
+    }, 100);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [isActive]);
+  return Math.floor(duration / 1000);
+}
 
 type ThinkingComponentProps = {
-  active: boolean;
   block: ThinkingBlock;
 };
-const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ active, block }) => {
-  const beginAt = useMemo(() => Date.now(), []);
-  const thoughtForSeconds = `${Math.round((Date.now() - beginAt) / 1000)} s`;
-  const [copied, setCopied] = useState(false);
+const ThinkingComponent: React.FC<ThinkingComponentProps> = ({ block }) => {
+  const cot = block.content.trim();
+  const { isActive } = useBlock();
+  const [expanded, setExpanded] = useState(isActive);
+  const seconds = useSeconds();
   useEffect(() => {
-    if (!copied) return;
-    const timeout = setTimeout(() => setCopied(false), 500);
-    return () => clearTimeout(timeout);
-  }, [copied]);
-  function onCopy() {
-    navigator.clipboard.writeText(block.content);
-    setCopied(true);
+    if (isActive) return;
+    setExpanded(false);
+  }, [isActive]);
+  function onExpandOrCollapse() {
+    setExpanded(!expanded);
   }
+  function onCopy() {
+    navigator.clipboard.writeText(cot);
+  }
+  const label = isActive ? `thinking (${seconds}s)...` : "thinking done";
   return (
-    <div className={styles.root} data-block="thinking" data-active={active ? "" : undefined}>
-      <div className={styles.container}>
-        <div className={styles.block}>
-          <BrainIcon size={16} />
-          <span>
-            {active ? `Thinking for ${thoughtForSeconds}...` : `Thought for ${thoughtForSeconds}`}
-          </span>
+    <div className={styles.root} data-block="thinking">
+      <div className={styles.header}>
+        <span>{label}</span>
+        <div className={styles.actions}>
+          <button onClick={onExpandOrCollapse}>{expanded ? "collapse" : "expand"}</button>
+          <button onClick={onCopy}>copy</button>
         </div>
-        <button className={styles.copy} disabled={copied} onClick={onCopy}>
-          {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
-        </button>
       </div>
-      {active ? (
-        <div className={styles.preview}>
-          {block.content.split("\n").map((line, i) => (
-            <p key={i}>{line}</p>
-          ))}
-        </div>
-      ) : null}
+      <div className={styles.content} data-expanded={expanded ? "" : undefined}>
+        {cot.split("\n").map((line, idx) => (
+          <p key={idx}>{line}</p>
+        ))}
+      </div>
     </div>
   );
 };
 const MemoedThinkingComponent = React.memo(ThinkingComponent, (prev, next) => {
   if (prev.block.id !== next.block.id) return false;
-  if (prev.active !== next.active) return false;
-  if (prev.block.content !== next.block.content) return false;
+  if (prev.block.hash !== next.block.hash) return false;
   return true;
 });
 

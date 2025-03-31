@@ -1,7 +1,8 @@
+import { Error } from "./ErrorBlock";
 import { Text } from "./TextBlock";
 import { Thinking } from "./ThinkingBlock";
-import { ToolCall } from "./ToolCallBlock";
+import { Tool } from "./ToolBlock";
 
-const Block = { Text, Thinking, ToolCall };
+const Block = { Error, Text, Thinking, Tool };
 
 export { Block };

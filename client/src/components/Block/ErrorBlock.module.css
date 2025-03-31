@@ -1,0 +1,35 @@
+.root {
+  --color-bg-tertiary: lch(5.6% 3 52);
+  --color-border-tertiary: lch(8.2% 5 52);
+  --color-text: lch(92% 12 52);
+}
+.root {
+  background: var(--color-bg-tertiary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-tertiary);
+}
+.header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding-block: 8px;
+  padding-inline: var(--spacing-padding-x);
+}
+.header span {
+  color: color-mix(in srgb, var(--color-text) 92%, transparent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.content {
+  border-top: 1px solid var(--color-border-tertiary);
+  color: color-mix(in srgb, var(--color-text) 67%, transparent);
+  display: block;
+  padding-block: var(--spacing-padding-x);
+  padding-inline: var(--spacing-padding-x);
+}
+.content span {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}

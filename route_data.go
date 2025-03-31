@@ -4,97 +4,60 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
+	"github.com/markusylisiurunen/juttele/internal/logger"
 	"github.com/markusylisiurunen/juttele/internal/repo"
-	"github.com/tidwall/gjson"
 )
 
-type dataResponseHistoryItemToolCallFunction struct {
-	Name string `json:"name"`
-	Args string `json:"arguments"`
-}
-type dataResponseHistoryItemToolCall struct {
-	ID       string                                  `json:"id"`
-	Function dataResponseHistoryItemToolCallFunction `json:"function"`
-}
-type dataResponseHistoryItemMessage struct {
-	Role      string                            `json:"role"`
-	Content   string                            `json:"content"`
-	ToolCalls []dataResponseHistoryItemToolCall `json:"tool_calls,omitempty"`
-}
-type dataResponseHistoryItemReasoning struct {
-	Content string `json:"content"`
-}
-type dataResponseHistoryItem struct {
-	Kind string `json:"kind"`
-	Data any    `json:"data"`
-}
-type dataResponseChat struct {
-	ID        int64                     `json:"id"`
-	CreatedAt string                    `json:"created_at"`
-	Title     string                    `json:"title"`
-	History   []dataResponseHistoryItem `json:"history"`
-}
-type dataResponse struct {
-	Chats []dataResponseChat `json:"chats"`
-}
+type (
+	dataResponse_Chat struct {
+		ID     int64   `json:"id"`
+		Ts     string  `json:"ts"`
+		Title  string  `json:"title"`
+		Blocks []Block `json:"blocks"`
+	}
+	dataResponse struct {
+		Chats []dataResponse_Chat `json:"chats"`
+	}
+)
 
 func (app *App) dataRouteHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var v dataResponse
-	v.Chats = make([]dataResponseChat, 0)
+	v.Chats = make([]dataResponse_Chat, 0)
 	chats, err := app.repo.ListChats(ctx)
 	if err != nil {
+		logger.Get().Error(fmt.Sprintf("error listing chats: %v", err))
 		http.Error(w, fmt.Sprintf("error listing chats: %v", err), http.StatusInternalServerError)
 		return
 	}
 	for _, chat := range chats.Items {
-		events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{ChatID: chat.ID})
+		vv := dataResponse_Chat{
+			ID:     chat.ID,
+			Ts:     chat.CreatedAt.Format(time.RFC3339),
+			Title:  chat.Title,
+			Blocks: make([]Block, 0),
+		}
+		blocks, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{
+			ChatID:     chat.ID,
+			KindPrefix: "block.",
+		})
 		if err != nil {
+			logger.Get().Error(fmt.Sprintf("error listing chat events: %v", err))
 			http.Error(w, fmt.Sprintf("error listing chat events: %v", err), http.StatusInternalServerError)
 			return
 		}
-		var vi dataResponseChat
-		vi.ID = chat.ID
-		vi.CreatedAt = chat.CreatedAt.Format(time.RFC3339Nano)
-		vi.Title = chat.Title
-		vi.History = make([]dataResponseHistoryItem, 0, len(events.Items))
-		for _, i := range events.Items {
-			if strings.HasPrefix(i.Kind, "message.") {
-				reasoning := gjson.GetBytes(i.Content, "reasoning")
-				if reasoning.Exists() {
-					vi.History = append(vi.History, dataResponseHistoryItem{
-						Kind: "reasoning",
-						Data: dataResponseHistoryItemReasoning{
-							Content: reasoning.String(),
-						},
-					})
-				}
-				itemData := dataResponseHistoryItemMessage{
-					Role:    strings.TrimPrefix(i.Kind, "message."),
-					Content: gjson.GetBytes(i.Content, "content").String(),
-				}
-				if gjson.GetBytes(i.Content, "tool_calls").Exists() {
-					itemData.ToolCalls = make([]dataResponseHistoryItemToolCall, 0)
-					for _, tc := range gjson.GetBytes(i.Content, "tool_calls").Array() {
-						itemData.ToolCalls = append(itemData.ToolCalls, dataResponseHistoryItemToolCall{
-							ID: tc.Get("id").String(),
-							Function: dataResponseHistoryItemToolCallFunction{
-								Name: tc.Get("function.name").String(),
-								Args: tc.Get("function.arguments").String(),
-							},
-						})
-					}
-				}
-				vi.History = append(vi.History, dataResponseHistoryItem{
-					Kind: "message",
-					Data: itemData,
-				})
+		for _, block := range blocks.Items {
+			b, err := parseBlock(block.Content)
+			if err != nil {
+				logger.Get().Error(fmt.Sprintf("error parsing block: %v", err))
+				http.Error(w, fmt.Sprintf("error parsing block: %v", err), http.StatusInternalServerError)
+				return
 			}
+			vv.Blocks = append(vv.Blocks, b)
 		}
-		v.Chats = append(v.Chats, vi)
+		v.Chats = append(v.Chats, vv)
 	}
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusOK)

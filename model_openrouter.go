@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,303 +17,190 @@ import (
 
 var _ Model = (*openRouterModel)(nil)
 
-type openRouterModelPersonality struct {
-	id           string
-	name         string
-	systemPrompt string
-}
-
 type openRouterModel struct {
-	id            string
-	apiKey        string
-	modelName     string
-	displayName   string
-	personalities []openRouterModelPersonality
-	tools         []Tool
+	*model
+	id        string
+	apiKey    string
+	modelName string
+	providers []string
 }
 
-type openRouterModelOption func(*openRouterModel)
-
-func WithOpenRouterModelDisplayName(name string) openRouterModelOption {
-	return func(m *openRouterModel) {
-		m.displayName = name
+func NewOpenRouterModel(
+	apiKey string, modelName string, providers []string, opts ...modelOption,
+) *openRouterModel {
+	m := &openRouterModel{
+		model:     &model{displayName: modelName},
+		apiKey:    apiKey,
+		modelName: modelName,
+		providers: providers,
 	}
-}
-
-func WithOpenRouterModelPersonality(name string, systemPrompt string) openRouterModelOption {
-	return func(m *openRouterModel) {
-		id := xxhash.New()
-		util.Must(id.WriteString("openrouter"))
-		util.Must(id.WriteString("personality"))
-		util.Must(id.WriteString(m.id))
-		util.Must(id.WriteString(m.displayName))
-		util.Must(id.WriteString(name))
-		m.personalities = append(m.personalities, openRouterModelPersonality{
-			id:           strconv.FormatUint(id.Sum64(), 10),
-			name:         name,
-			systemPrompt: systemPrompt,
-		})
+	for _, opt := range opts {
+		opt(m.model)
 	}
-}
-
-func WithOpenRouterModelTools(tools ...Tool) openRouterModelOption {
-	return func(m *openRouterModel) {
-		m.tools = append(m.tools, tools...)
-	}
-}
-
-func NewOpenRouterModel(apiKey string, modelName string, opts ...openRouterModelOption) *openRouterModel {
 	id := xxhash.New()
 	util.Must(id.WriteString("openrouter"))
 	util.Must(id.WriteString(modelName))
-	m := &openRouterModel{
-		apiKey:        apiKey,
-		modelName:     modelName,
-		displayName:   modelName,
-		personalities: []openRouterModelPersonality{},
-		tools:         []Tool{},
-	}
-	for _, opt := range opts {
-		opt(m)
-	}
 	util.Must(id.WriteString(m.displayName))
 	m.id = "openrouter_" + strconv.FormatUint(id.Sum64(), 10)
 	return m
 }
 
 func (m *openRouterModel) GetModelInfo() ModelInfo {
-	personalities := make([]ModelPersonality, len(m.personalities))
-	for i, p := range m.personalities {
-		personalities[i] = ModelPersonality{
-			ID:           p.id,
-			Name:         p.name,
-			SystemPrompt: p.systemPrompt,
-		}
-	}
-	return ModelInfo{
-		ID:            m.id,
-		Name:          m.displayName,
-		Personalities: personalities,
-	}
+	return m.getModelInfo(m.id)
 }
 
-func (m *openRouterModel) StreamCompletion(ctx context.Context, systemPrompt string, history []ChatEvent, opts CompletionOpts) <-chan ChatEvent {
-	temp := make([]ChatEvent, len(history))
-	copy(temp, history)
-	history = temp
-	out := make(chan ChatEvent)
-	go func() {
+func (m *openRouterModel) StreamCompletion(
+	ctx context.Context, history []Message, opts GenerationConfig,
+) <-chan Result[Message] {
+	copied := make([]Message, len(history))
+	copy(copied, history)
+	return streamWithTools(ctx, opts.Tools, &copied, func() <-chan Result[Message] {
+		out := make(chan Result[Message], 1)
 		defer close(out)
-		type respBodyToolCall struct {
-			Index    int64  `json:"index"`
-			ID       string `json:"id"`
-			Type     string `json:"type"`
-			Function struct {
-				Name      string `json:"name"`
-				Arguments string `json:"arguments"`
-			} `json:"function"`
+		resp, err := m.request(ctx, copied, opts)
+		if err != nil {
+			out <- Err[Message](err)
+			return out
 		}
-		type respBody struct {
-			Model   string `json:"model"`
-			Choices []struct {
-				Delta struct {
-					Reasoning *string            `json:"reasoning"`
-					Content   *string            `json:"content"`
-					ToolCalls []respBodyToolCall `json:"tool_calls"`
-				} `json:"delta"`
-			} `json:"choices"`
+		return streamOpenAI(resp)
+	})
+}
+
+func (m *openRouterModel) request(
+	ctx context.Context, history []Message, opts GenerationConfig,
+) (*http.Response, error) {
+	type reqBody_toolCall_function struct {
+		Name string `json:"name"`
+		Args string `json:"arguments"`
+	}
+	type reqBody_toolCall struct {
+		ID       string                    `json:"id"`
+		Type     string                    `json:"type"`
+		Function reqBody_toolCall_function `json:"function"`
+	}
+	type reqBody_message struct {
+		Role       string             `json:"role"`
+		Content    string             `json:"content"`
+		ToolCalls  []reqBody_toolCall `json:"tool_calls,omitempty"`
+		ToolCallID string             `json:"tool_call_id,omitempty"`
+	}
+	type reqBody_tool struct {
+		Type     string          `json:"type"`
+		Function json.RawMessage `json:"function"`
+	}
+	type reqBody_provider struct {
+		AllowFallbacks bool     `json:"allow_fallbacks"`
+		Order          []string `json:"order"`
+	}
+	type reqBody struct {
+		IncludeReasoning bool              `json:"include_reasoning"`
+		MaxTokens        int64             `json:"max_tokens,omitempty"`
+		Messages         []reqBody_message `json:"messages"`
+		Model            string            `json:"model"`
+		Provider         *reqBody_provider `json:"provider,omitempty"`
+		Stream           bool              `json:"stream"`
+		Temperature      float64           `json:"temperature"`
+		Tools            []reqBody_tool    `json:"tools,omitempty"`
+	}
+	b := reqBody{
+		IncludeReasoning: true,
+		MaxTokens:        m.maxTokens,
+		Messages:         []reqBody_message{},
+		Model:            m.modelName,
+		Stream:           true,
+		Temperature:      m.temperature,
+	}
+	if len(m.providers) > 0 {
+		b.Provider = &reqBody_provider{
+			AllowFallbacks: false,
+			Order:          m.providers,
 		}
-	llm:
-		chunks := callOpenAICompatibleAPI(ctx,
-			func(ctx context.Context) (*http.Response, error) {
-				type reqBodyToolCall struct {
-					ID       string `json:"id"`
-					Type     string `json:"type"`
-					Function struct {
-						Name string `json:"name"`
-						Args string `json:"arguments"`
-					} `json:"function"`
-				}
-				type reqBodyMessage struct {
-					Role       string            `json:"role"`
-					Content    string            `json:"content"`
-					ToolCalls  []reqBodyToolCall `json:"tool_calls,omitempty"`
-					ToolCallID *string           `json:"tool_call_id,omitempty"`
-				}
-				type reqBodyTool struct {
-					Type     string          `json:"type"`
-					Function json.RawMessage `json:"function"`
-				}
-				type reqBody struct {
-					IncludeReasoning bool             `json:"include_reasoning"`
-					Messages         []reqBodyMessage `json:"messages"`
-					Model            string           `json:"model"`
-					Stream           bool             `json:"stream"`
-					Temperature      float64          `json:"temperature"`
-					Tools            []reqBodyTool    `json:"tools,omitempty"`
-				}
-				b := reqBody{
-					IncludeReasoning: true,
-					Messages:         make([]reqBodyMessage, 0),
-					Model:            m.modelName,
-					Stream:           true,
-					Temperature:      0.7,
-				}
-				if opts.UseTools {
-					allTools := make([]Tool, 0, len(m.tools)+len(opts.ClientTools))
-					allTools = append(allTools, m.tools...)
-					allTools = append(allTools, opts.ClientTools...)
-					for _, t := range allTools {
-						b.Tools = append(b.Tools, reqBodyTool{
-							Type:     "function",
-							Function: t.Spec(),
-						})
-					}
-				}
-				if len(systemPrompt) > 0 {
-					loc, _ := time.LoadLocation("Europe/Helsinki")
-					now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
-					b.Messages = append(b.Messages, reqBodyMessage{
-						Role:    "system",
-						Content: strings.ReplaceAll(systemPrompt, "{{current_time}}", now),
-					})
-				}
-				for _, i := range history {
-					switch i := i.(type) {
-					case *AssistantMessageChatEvent:
-						message := reqBodyMessage{
-							Role:    "assistant",
-							Content: i.content,
-						}
-						for _, t := range i.toolCalls {
-							message.ToolCalls = append(message.ToolCalls, reqBodyToolCall{
-								ID:   t.ID,
-								Type: t.Type,
-								Function: struct {
-									Name string `json:"name"`
-									Args string `json:"arguments"`
-								}{
-									Name: t.FuncName,
-									Args: t.FuncArgs,
-								},
-							})
-						}
-						b.Messages = append(b.Messages, message)
-					case *ToolMessageChatEvent:
-						toolCallID := i.callID
-						b.Messages = append(b.Messages, reqBodyMessage{
-							Role:       "tool",
-							Content:    i.content,
-							ToolCallID: &toolCallID,
-						})
-					case *UserMessageChatEvent:
-						b.Messages = append(b.Messages, reqBodyMessage{
-							Role:    "user",
-							Content: i.content,
-						})
-					}
-				}
-				var buf bytes.Buffer
-				enc := json.NewEncoder(&buf)
-				enc.SetEscapeHTML(false)
-				if err := enc.Encode(b); err != nil {
-					return nil, err
-				}
-				req, err := http.NewRequestWithContext(ctx,
-					http.MethodPost, "https://openrouter.ai/api/v1/chat/completions",
-					&buf,
-				)
-				if err != nil {
-					return nil, err
-				}
-				req.Header.Set("Authorization", "Bearer "+m.apiKey)
-				req.Header.Set("Content-Type", "application/json")
-				return http.DefaultClient.Do(req)
-			},
-		)
-		toolCallBuffer := make(map[int64]respBodyToolCall)
-		resp := NewAssistantMessageChatEvent("")
-		out <- resp
-		for r := range chunks {
-			if r.Err != nil {
-				fmt.Printf("error: %v\n", r.Err)
-				return
-			}
-			var b respBody
-			if err := json.Unmarshal([]byte(r.Val), &b); err != nil {
-				fmt.Printf("error: %v\n", err)
-				return
-			}
-			if len(b.Choices) == 0 {
-				return
-			}
-			if len(b.Choices[0].Delta.ToolCalls) > 0 {
-				for _, t := range b.Choices[0].Delta.ToolCalls {
-					if _, ok := toolCallBuffer[t.Index]; !ok {
-						c := respBodyToolCall{
-							Index: t.Index,
-							ID:    t.ID,
-							Type:  t.Type,
-						}
-						c.Function.Name = t.Function.Name
-						toolCallBuffer[t.Index] = c
-						resp.toolCalls = append(resp.toolCalls, assistantMessageToolCall{
-							ID:       t.ID,
-							Type:     t.Type,
-							FuncName: t.Function.Name,
-							FuncArgs: "",
-						})
-						out <- resp
-					}
-					c := toolCallBuffer[t.Index]
-					c.Function.Arguments += t.Function.Arguments
-					toolCallBuffer[t.Index] = c
-				}
-			}
-			if b.Choices[0].Delta.Reasoning != nil {
-				resp.reasoning += *b.Choices[0].Delta.Reasoning
-				out <- resp
-			}
-			if b.Choices[0].Delta.Content != nil {
-				resp.content += *b.Choices[0].Delta.Content
-				out <- resp
-			}
+	}
+	if opts.Temperature != nil {
+		b.Temperature = *opts.Temperature
+	}
+	if opts.Tools != nil && opts.Tools.Count() > 0 {
+		for _, t := range opts.Tools.List() {
+			b.Tools = append(b.Tools, reqBody_tool{
+				Type:     "function",
+				Function: t.Spec(),
+			})
 		}
-		if len(toolCallBuffer) > 0 {
-			// send the tool calls
-			resp.toolCalls = make([]assistantMessageToolCall, 0)
-			for _, t := range toolCallBuffer {
-				resp.toolCalls = append(resp.toolCalls, assistantMessageToolCall{
-					ID:       t.ID,
-					Type:     t.Type,
-					FuncName: t.Function.Name,
-					FuncArgs: t.Function.Arguments,
+	}
+	for _, i := range history {
+		switch i := i.(type) {
+		case *SystemMessage:
+			loc, _ := time.LoadLocation("Europe/Helsinki")
+			now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
+			systemPrompt := strings.ReplaceAll(i.Content, "{{current_time}}", now)
+			b.Messages = append(b.Messages, reqBody_message{
+				Role:    "system",
+				Content: systemPrompt,
+			})
+		case *AssistantMessage:
+			msg := reqBody_message{
+				Role:    "assistant",
+				Content: i.Content,
+			}
+			for _, t := range i.ToolCalls {
+				msg.ToolCalls = append(msg.ToolCalls, reqBody_toolCall{
+					ID:   t.CallID,
+					Type: "function",
+					Function: reqBody_toolCall_function{
+						Name: t.FuncName,
+						Args: t.FuncArgs,
+					},
 				})
 			}
-			history = append(history, resp)
-			out <- resp
-			// execute the tool calls
-			for _, t := range toolCallBuffer {
-				allTools := make([]Tool, 0, len(m.tools)+len(opts.ClientTools))
-				allTools = append(allTools, m.tools...)
-				allTools = append(allTools, opts.ClientTools...)
-				for _, tt := range allTools {
-					if tt.Name() == t.Function.Name {
-						v, err := tt.Call(ctx, t.Function.Arguments)
-						if err != nil {
-							fmt.Printf("error: %v\n", err)
-							vv, _ := json.Marshal(map[string]any{"ok": false, "error": err.Error()})
-							v = string(vv)
-						}
-						resp := NewToolMessageChatEvent(t.ID, v)
-						history = append(history, resp)
-						out <- resp
-						break
-					}
-				}
+			b.Messages = append(b.Messages, msg)
+		case *ToolMessage:
+			msg := reqBody_message{
+				Role:       "tool",
+				ToolCallID: i.CallID,
 			}
-			goto llm
+			if i.Error != nil {
+				msg.Content = fmt.Sprintf("Error: %s", i.Error.Message)
+			} else {
+				msg.Content = *i.Result
+			}
+			b.Messages = append(b.Messages, msg)
+		case *UserMessage:
+			if len(b.Messages) > 0 && b.Messages[len(b.Messages)-1].Role == "user" {
+				b.Messages[len(b.Messages)-1].Content += "\n\n" + i.Content
+				continue
+			}
+			b.Messages = append(b.Messages, reqBody_message{
+				Role:    "user",
+				Content: i.Content,
+			})
 		}
-	}()
-	return out
+	}
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(b); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx,
+		http.MethodPost, "https://openrouter.ai/api/v1/chat/completions", &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+m.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		if err := resp.Body.Close(); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, body)
+	}
+	return resp, nil
 }

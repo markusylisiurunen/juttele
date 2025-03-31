@@ -1,11 +1,16 @@
 .root {
   display: flex;
-  flex-direction: column;
   flex: 1;
   overflow: hidden;
 }
 .history {
   overflow-y: auto;
-  padding-block-end: 64px;
-  padding-block-start: calc(64px + 8px);
+  padding-block-end: calc(6 * var(--spacing-padding-x));
+  padding-block-start: var(--spacing-padding-x);
+  padding-inline: var(--spacing-padding-x);
+  width: 100%;
+}
+.blocks {
+  margin-inline: auto;
+  max-width: var(--max-width);
 }

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,353 +18,272 @@ import (
 
 var _ Model = (*anthropicModel)(nil)
 
-type anthropicModelPersonality struct {
-	id           string
-	name         string
-	systemPrompt string
-}
-
 type anthropicModel struct {
-	id               string
-	apiKey           string
-	modelName        string
-	displayName      string
-	personalities    []anthropicModelPersonality
-	tools            []Tool
-	extendedThinking bool
+	*model
+	id        string
+	apiKey    string
+	modelName string
 }
 
-type anthropicModelOption func(*anthropicModel)
-
-func WithAnthropicModelDisplayName(name string) anthropicModelOption {
-	return func(m *anthropicModel) {
-		m.displayName = name
+func NewAnthropicModel(
+	apiKey string, modelName string, opts ...modelOption,
+) *anthropicModel {
+	m := &anthropicModel{
+		model:     &model{displayName: modelName},
+		apiKey:    apiKey,
+		modelName: modelName,
 	}
-}
-
-func WithAnthropicModelPersonality(name string, systemPrompt string) anthropicModelOption {
-	return func(m *anthropicModel) {
-		id := xxhash.New()
-		util.Must(id.WriteString("anthropic"))
-		util.Must(id.WriteString("personality"))
-		util.Must(id.WriteString(m.id))
-		util.Must(id.WriteString(m.displayName))
-		util.Must(id.WriteString(name))
-		m.personalities = append(m.personalities, anthropicModelPersonality{
-			id:           strconv.FormatUint(id.Sum64(), 10),
-			name:         name,
-			systemPrompt: systemPrompt,
-		})
+	for _, opt := range opts {
+		opt(m.model)
 	}
-}
-
-func WithAnthropicModelTools(tools ...Tool) anthropicModelOption {
-	return func(m *anthropicModel) {
-		m.tools = append(m.tools, tools...)
-	}
-}
-
-func WithAnthropicModelExtendedThinking() anthropicModelOption {
-	return func(m *anthropicModel) {
-		m.extendedThinking = true
-	}
-}
-
-func NewAnthropicModel(apiKey string, modelName string, opts ...anthropicModelOption) *anthropicModel {
 	id := xxhash.New()
 	util.Must(id.WriteString("anthropic"))
 	util.Must(id.WriteString(modelName))
-	m := &anthropicModel{
-		apiKey:           apiKey,
-		modelName:        modelName,
-		displayName:      modelName,
-		personalities:    []anthropicModelPersonality{},
-		tools:            []Tool{},
-		extendedThinking: false,
-	}
-	for _, opt := range opts {
-		opt(m)
-	}
 	util.Must(id.WriteString(m.displayName))
 	m.id = "anthropic_" + strconv.FormatUint(id.Sum64(), 10)
 	return m
 }
 
 func (m *anthropicModel) GetModelInfo() ModelInfo {
-	personalities := make([]ModelPersonality, len(m.personalities))
-	for i, p := range m.personalities {
-		personalities[i] = ModelPersonality{
-			ID:           p.id,
-			Name:         p.name,
-			SystemPrompt: p.systemPrompt,
-		}
-	}
-	return ModelInfo{
-		ID:            m.id,
-		Name:          m.displayName,
-		Personalities: personalities,
-	}
+	return m.getModelInfo(m.id)
 }
 
-func (m *anthropicModel) StreamCompletion(ctx context.Context, systemPrompt string, history []ChatEvent, opts CompletionOpts) <-chan ChatEvent {
-	temp := make([]ChatEvent, len(history))
-	copy(temp, history)
-	history = temp
-	out := make(chan ChatEvent)
-	go func() {
+func (m *anthropicModel) StreamCompletion(
+	ctx context.Context, history []Message, opts GenerationConfig,
+) <-chan Result[Message] {
+	out := make(chan Result[Message], 1)
+	defer close(out)
+	if opts.Tools != nil && opts.Tools.Count() > 0 && opts.Think {
+		out <- Err[Message](errors.New("tools cannot be used with extended thinking for now"))
+		return out
+	}
+	if opts.Think && !m.isThinkingModel() {
+		out <- Err[Message](errors.New("extended thinking is not supported with this model"))
+		return out
+	}
+	copied := make([]Message, len(history))
+	copy(copied, history)
+	return streamWithTools(ctx, opts.Tools, &copied, func() <-chan Result[Message] {
+		out := make(chan Result[Message], 1)
 		defer close(out)
-		type respContentBlockStart struct {
-			Type         string `json:"type"`
-			Index        int    `json:"index"`
-			ContentBlock struct {
-				Type string `json:"type"`
-				ID   string `json:"id"`
-				Name string `json:"name"`
-			} `json:"content_block"`
+		resp, err := m.request(ctx, copied, opts)
+		if err != nil {
+			out <- Err[Message](err)
+			return out
 		}
-		type respContentBlockDelta struct {
-			Type  string `json:"type"`
-			Index int    `json:"index"`
-			Delta struct {
-				Type        string `json:"type"`
-				Text        string `json:"text"`
-				Thinking    string `json:"thinking"`
-				PartialJSON string `json:"partial_json"`
-			} `json:"delta"`
+		return streamAnthropic(resp)
+	})
+}
+
+func (m *anthropicModel) isThinkingModel() bool {
+	return strings.Contains(m.modelName, "claude-3-7-sonnet")
+}
+
+func (m *anthropicModel) request(
+	ctx context.Context, history []Message, opts GenerationConfig,
+) (*http.Response, error) {
+	type reqBody_message_text struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	type reqBody_message_toolUse struct {
+		Type  string          `json:"type"`
+		ID    string          `json:"id"`
+		Name  string          `json:"name"`
+		Input json.RawMessage `json:"input"`
+	}
+	type reqBody_message_toolResult struct {
+		Type      string `json:"type"`
+		ToolUseID string `json:"tool_use_id"`
+		Content   string `json:"content"`
+	}
+	type reqBody_message struct {
+		Role    string `json:"role"`
+		Content []any  `json:"content"`
+	}
+	type reqBody_thinking struct {
+		Type         string `json:"type"`
+		BudgetTokens int64  `json:"budget_tokens"`
+	}
+	type reqBody struct {
+		MaxTokens   int64             `json:"max_tokens"`
+		Messages    []reqBody_message `json:"messages"`
+		Model       string            `json:"model"`
+		Stream      bool              `json:"stream"`
+		System      *string           `json:"system,omitempty"`
+		Temperature float64           `json:"temperature"`
+		Thinking    *reqBody_thinking `json:"thinking,omitempty"`
+		Tools       []json.RawMessage `json:"tools,omitempty"`
+	}
+	b := reqBody{
+		MaxTokens:   m.maxTokens,
+		Messages:    []reqBody_message{},
+		Model:       m.modelName,
+		Stream:      true,
+		Temperature: m.temperature,
+	}
+	if b.MaxTokens == 0 {
+		b.MaxTokens = 16384
+	}
+	if opts.Temperature != nil {
+		b.Temperature = *opts.Temperature
+	}
+	if opts.Think {
+		b.Temperature = 1.0 // NOTE: Anthropic does not support temperature for extended thinking
+		b.Thinking = &reqBody_thinking{
+			Type:         "enabled",
+			BudgetTokens: 8192, // TODO: make this configurable
 		}
-		type respBodyToolUse struct {
-			Index    int
-			ID       string
-			FuncName string
-			FuncArgs string
-		}
-	llm:
-		chunks := callAnySSEAPI(ctx,
-			func(ctx context.Context) (*http.Response, error) {
-				type reqBodyThinking struct {
-					Type         string `json:"type"`
-					BudgetTokens int64  `json:"budget_tokens"`
-				}
-				type reqBodyMessageContent struct {
-					Type string `json:"type"`
-					// text fields
-					Text string `json:"text,omitzero"`
-					// tool result fields
-					ToolUseID string `json:"tool_use_id,omitzero"`
-					Content   string `json:"content,omitzero"`
-					// tool call fields
-					ID    string          `json:"id,omitzero"`
-					Name  string          `json:"name,omitzero"`
-					Input json.RawMessage `json:"input,omitzero"`
-				}
-				type reqBodyMessage struct {
-					Role    string                  `json:"role"`
-					Content []reqBodyMessageContent `json:"content"`
-				}
-				type reqBody struct {
-					MaxTokens   int64             `json:"max_tokens"`
-					Messages    []reqBodyMessage  `json:"messages"`
-					Model       string            `json:"model"`
-					Stream      bool              `json:"stream"`
-					System      *string           `json:"system,omitempty"`
-					Temperature float64           `json:"temperature"`
-					Thinking    *reqBodyThinking  `json:"thinking,omitempty"`
-					Tools       []json.RawMessage `json:"tools,omitempty"`
-				}
-				b := reqBody{
-					MaxTokens:   128_000 / 2,
-					Messages:    make([]reqBodyMessage, 0),
-					Model:       m.modelName,
-					Stream:      true,
-					Temperature: 1.0,
-				}
-				if opts.UseTools {
-					allTools := make([]Tool, 0, len(m.tools)+len(opts.ClientTools))
-					allTools = append(allTools, m.tools...)
-					allTools = append(allTools, opts.ClientTools...)
-					for _, t := range allTools {
-						spec, err := toAnthropicToolSpec(t.Spec())
-						if err != nil {
-							return nil, err
-						}
-						b.Tools = append(b.Tools, spec)
-					}
-				}
-				if m.extendedThinking {
-					if len(b.Tools) > 0 {
-						return nil, fmt.Errorf("extended thinking is not supported with tools yet")
-					}
-					b.Thinking = &reqBodyThinking{
-						Type:         "enabled",
-						BudgetTokens: 8192,
-					}
-				}
-				if len(systemPrompt) > 0 {
-					loc, _ := time.LoadLocation("Europe/Helsinki")
-					now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
-					prompt := strings.ReplaceAll(systemPrompt, "{{current_time}}", now)
-					b.System = &prompt
-				}
-				for _, i := range history {
-					switch i := i.(type) {
-					case *AssistantMessageChatEvent:
-						content := []reqBodyMessageContent{}
-						content = append(content, reqBodyMessageContent{
-							Type: "text",
-							Text: i.content,
-						})
-						for _, t := range i.toolCalls {
-							content = append(content, reqBodyMessageContent{
-								Type:  "tool_use",
-								ID:    t.ID,
-								Name:  t.FuncName,
-								Input: json.RawMessage(t.FuncArgs),
-							})
-						}
-						b.Messages = append(b.Messages, reqBodyMessage{
-							Role:    "assistant",
-							Content: content,
-						})
-					case *ToolMessageChatEvent:
-						content := []reqBodyMessageContent{}
-						content = append(content, reqBodyMessageContent{
-							Type:      "tool_result",
-							ToolUseID: i.callID,
-							Content:   i.content,
-						})
-						b.Messages = append(b.Messages, reqBodyMessage{
-							Role:    "user",
-							Content: content,
-						})
-					case *UserMessageChatEvent:
-						content := []reqBodyMessageContent{}
-						content = append(content, reqBodyMessageContent{
-							Type: "text",
-							Text: i.content,
-						})
-						b.Messages = append(b.Messages, reqBodyMessage{
-							Role:    "user",
-							Content: content,
-						})
-					}
-				}
-				var buf bytes.Buffer
-				enc := json.NewEncoder(&buf)
-				enc.SetEscapeHTML(false)
-				if err := enc.Encode(b); err != nil {
-					return nil, err
-				}
-				req, err := http.NewRequestWithContext(ctx,
-					http.MethodPost, "https://api.anthropic.com/v1/messages",
-					&buf,
-				)
-				if err != nil {
-					return nil, err
-				}
-				req.Header.Set("anthropic-version", "2023-06-01")
-				req.Header.Set("content-type", "application/json")
-				req.Header.Set("x-api-key", m.apiKey)
-				return http.DefaultClient.Do(req)
-			},
-		)
-		toolCallBuffer := make(map[int]respBodyToolUse)
-		resp := NewAssistantMessageChatEvent("")
-		out <- resp
-		for r := range chunks {
-			if r.Err != nil {
-				fmt.Printf("error: %v\n", r.Err)
-				return
+	}
+	if opts.Tools != nil && opts.Tools.Count() > 0 {
+		for _, t := range opts.Tools.List() {
+			spec, err := m.spec(t.Spec())
+			if err != nil {
+				return nil, err
 			}
-			if r.Val.T1 == "content_block_start" {
-				var b respContentBlockStart
-				if err := json.Unmarshal([]byte(r.Val.T2), &b); err != nil {
-					fmt.Printf("error: %v\n", err)
-					return
-				}
-				if b.ContentBlock.Type == "tool_use" {
-					toolCallBuffer[len(toolCallBuffer)] = respBodyToolUse{
-						Index:    b.Index,
-						ID:       b.ContentBlock.ID,
-						FuncName: b.ContentBlock.Name,
-						FuncArgs: "",
-					}
-					resp.toolCalls = append(resp.toolCalls, assistantMessageToolCall{
-						ID:       b.ContentBlock.ID,
-						Type:     "function",
-						FuncName: b.ContentBlock.Name,
-						FuncArgs: "",
-					})
-					out <- resp
-				}
-				continue
-			}
-			if r.Val.T1 == "content_block_delta" {
-				var b respContentBlockDelta
-				if err := json.Unmarshal([]byte(r.Val.T2), &b); err != nil {
-					fmt.Printf("error: %v\n", err)
-					return
-				}
-				if b.Delta.Type == "thinking_delta" && b.Delta.Thinking != "" {
-					resp.reasoning += b.Delta.Thinking
-					out <- resp
-				}
-				if b.Delta.Type == "text_delta" && b.Delta.Text != "" {
-					resp.content += b.Delta.Text
-					out <- resp
-				}
-				if b.Delta.Type == "input_json_delta" && b.Delta.PartialJSON != "" {
-					for i, v := range toolCallBuffer {
-						if v.Index == b.Index {
-							v.FuncArgs += b.Delta.PartialJSON
-							toolCallBuffer[i] = v
-							resp.toolCalls[i].FuncArgs = v.FuncArgs
-							out <- resp
-							break
-						}
-					}
-				}
-				continue
-			}
+			b.Tools = append(b.Tools, spec)
 		}
-		if len(toolCallBuffer) > 0 {
-			// send the tool calls
-			resp.toolCalls = make([]assistantMessageToolCall, 0)
-			for _, t := range toolCallBuffer {
-				funcArgs := t.FuncArgs
-				if funcArgs == "" {
-					funcArgs = "{}"
-				}
-				resp.toolCalls = append(resp.toolCalls, assistantMessageToolCall{
-					ID:       t.ID,
-					Type:     "function",
-					FuncName: t.FuncName,
-					FuncArgs: funcArgs,
+	}
+	for _, i := range history {
+		switch i := i.(type) {
+		case *SystemMessage:
+			loc, _ := time.LoadLocation("Europe/Helsinki")
+			now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
+			systemPrompt := strings.ReplaceAll(i.Content, "{{current_time}}", now)
+			b.System = &systemPrompt
+		case *AssistantMessage:
+			content := []any{reqBody_message_text{
+				Type: "text",
+				Text: i.Content,
+			}}
+			for _, t := range i.ToolCalls {
+				content = append(content, reqBody_message_toolUse{
+					Type:  "tool_use",
+					ID:    t.CallID,
+					Name:  t.FuncName,
+					Input: json.RawMessage(t.FuncArgs),
 				})
 			}
-			history = append(history, resp)
-			out <- resp
-			// execute the tool calls
-			for _, t := range toolCallBuffer {
-				allTools := make([]Tool, 0, len(m.tools)+len(opts.ClientTools))
-				allTools = append(allTools, m.tools...)
-				allTools = append(allTools, opts.ClientTools...)
-				for _, tt := range allTools {
-					if tt.Name() == t.FuncName {
-						v, err := tt.Call(ctx, t.FuncArgs)
-						if err != nil {
-							fmt.Printf("error: %v\n", err)
-							vv, _ := json.Marshal(map[string]any{"ok": false, "error": err.Error()})
-							v = string(vv)
-						}
-						resp := NewToolMessageChatEvent(t.ID, v)
-						history = append(history, resp)
-						out <- resp
-						break
-					}
-				}
+			b.Messages = append(b.Messages, reqBody_message{
+				Role:    "assistant",
+				Content: content,
+			})
+		case *ToolMessage:
+			content := []any{}
+			if i.Error != nil {
+				content = append(content, reqBody_message_toolResult{
+					Type:      "tool_result",
+					ToolUseID: i.CallID,
+					Content:   fmt.Sprintf("Error: %s", i.Error.Message),
+				})
+			} else {
+				content = append(content, reqBody_message_toolResult{
+					Type:      "tool_result",
+					ToolUseID: i.CallID,
+					Content:   *i.Result,
+				})
 			}
-			goto llm
+			b.Messages = append(b.Messages, reqBody_message{
+				Role:    "user",
+				Content: content,
+			})
+		case *UserMessage:
+			if len(b.Messages) > 0 && b.Messages[len(b.Messages)-1].Role == "user" {
+				idx := len(b.Messages) - 1
+				b.Messages[idx].Content = append(b.Messages[idx].Content, reqBody_message_text{
+					Type: "text",
+					Text: i.Content,
+				})
+				continue
+			}
+			content := []any{reqBody_message_text{
+				Type: "text",
+				Text: i.Content,
+			}}
+			b.Messages = append(b.Messages, reqBody_message{
+				Role:    "user",
+				Content: content,
+			})
 		}
-	}()
-	return out
+	}
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(b); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx,
+		http.MethodPost, "https://api.anthropic.com/v1/messages", &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("x-api-key", m.apiKey)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		if err := resp.Body.Close(); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, body)
+	}
+	return resp, nil
+}
+
+func (m *anthropicModel) spec(spec []byte) ([]byte, error) {
+	type OpenAIToolSpec struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Parameters  struct {
+			Type       string `json:"type"`
+			Properties map[string]struct {
+				Type        string `json:"type"`
+				Description string `json:"description"`
+			} `json:"properties"`
+			Required             []string `json:"required"`
+			AdditionalProperties bool     `json:"additionalProperties"`
+		} `json:"parameters"`
+	}
+	type AnthropicToolSpec struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		InputSchema struct {
+			Type       string `json:"type"`
+			Properties map[string]struct {
+				Type        string `json:"type"`
+				Description string `json:"description"`
+			} `json:"properties"`
+			Required []string `json:"required"`
+		} `json:"input_schema"`
+	}
+	var openAITool OpenAIToolSpec
+	if err := json.Unmarshal(spec, &openAITool); err != nil {
+		return nil, err
+	}
+	var anthropicTool AnthropicToolSpec
+	anthropicTool.Name = openAITool.Name
+	anthropicTool.Description = openAITool.Description
+	anthropicTool.InputSchema.Type = openAITool.Parameters.Type
+	anthropicTool.InputSchema.Properties = make(map[string]struct {
+		Type        string `json:"type"`
+		Description string `json:"description"`
+	})
+	for k, v := range openAITool.Parameters.Properties {
+		anthropicTool.InputSchema.Properties[k] = struct {
+			Type        string `json:"type"`
+			Description string `json:"description"`
+		}{
+			Type:        v.Type,
+			Description: v.Description,
+		}
+	}
+	anthropicTool.InputSchema.Required = openAITool.Parameters.Required
+	return json.Marshal(anthropicTool)
 }

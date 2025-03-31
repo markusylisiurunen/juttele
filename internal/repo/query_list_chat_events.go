@@ -7,7 +7,8 @@ import (
 )
 
 type ListChatEventsArgs struct {
-	ChatID int64
+	ChatID     int64
+	KindPrefix string
 }
 
 type ListChatEventsResult struct {
@@ -23,10 +24,12 @@ func (r *Repository) ListChatEvents(ctx context.Context, args ListChatEventsArgs
 	var query = `
 	select chat_event_created_at, chat_event_uuid, chat_event_kind, chat_event_content
 	from chat_events
-	where chat_id = ?
+	where
+		chat_id = ?
+		and chat_event_kind like ?
 	order by chat_event_created_at asc, chat_event_id asc
 	`
-	rows, err := r.db.QueryContext(ctx, query, args.ChatID)
+	rows, err := r.db.QueryContext(ctx, query, args.ChatID, args.KindPrefix+"%")
 	if err != nil {
 		return ListChatEventsResult{}, err
 	}

@@ -1,0 +1,72 @@
+.root {
+  padding-inline: var(--spacing-padding-x);
+  width: 100%;
+}
+.container {
+  align-items: center;
+  display: flex;
+  gap: 32px;
+  justify-content: space-between;
+  margin-inline: auto;
+  max-width: var(--max-width);
+  padding-block: 8px;
+  width: 100%;
+}
+.left,
+.right {
+  align-items: center;
+  display: flex;
+}
+.left {
+  flex: 1 1 auto;
+  gap: 8px;
+}
+.right {
+  flex: 0 0 auto;
+  gap: 8px;
+}
+.container h1 {
+  display: inline-block;
+  flex: 0 1 auto;
+  font-size: 1em;
+  font-weight: 400;
+  margin: 0px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.iconButton {
+  align-items: center;
+  border-radius: 50%;
+  color: color-mix(in srgb, var(--color-text) 33%, var(--color-bg));
+  display: flex;
+  flex: 0 0 auto;
+  height: 28px;
+  justify-content: center;
+  transition: background 90ms linear, color 90ms linear;
+  width: 28px;
+}
+.iconButton:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  color: var(--color-text);
+}
+.textButton {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  border-radius: 5px;
+  color: color-mix(in srgb, var(--color-text) 50%, var(--color-bg));
+  display: flex;
+  flex: 0 0 auto;
+  height: 28px;
+  justify-content: center;
+  padding-inline: 8px;
+  transition: background 90ms linear, color 90ms linear;
+}
+.textButton:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  color: var(--color-text);
+}
+.textButton span {
+  display: inline-block;
+  white-space: nowrap;
+}

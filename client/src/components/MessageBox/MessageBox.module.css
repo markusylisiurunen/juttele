@@ -1,85 +1,16 @@
 .root {
-  background: var(--color-bg);
-}
-/* main area */
-.main {
-  padding-block-start: 8px;
+  padding-block: 0px 1px;
   padding-inline: var(--spacing-padding-x);
-}
-.main textarea {
-  appearance: none;
-  background: color-mix(in srgb, var(--color-text) 2%, transparent);
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
-  color: inherit;
-  display: block;
-  font-size: inherit;
-  height: calc(2 * (10px + 1px) + 4em);
-  line-height: inherit;
-  outline: none;
-  padding-block: 10px;
-  padding-inline: 12px;
-  resize: none;
-  transition: border-color 90ms linear;
   width: 100%;
 }
-.main textarea::placeholder {
-  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+.container {
+  background: var(--color-bg-secondary);
+  border-radius: 16px 16px 0px 0px;
+  border: 1px solid var(--color-border-secondary);
+  margin-inline: auto;
+  max-width: var(--max-width);
+  overflow: hidden;
 }
-.main textarea:focus-visible {
-  border-color: color-mix(in srgb, var(--color-text) 16%, transparent);
-}
-/* footer area */
-.footer {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-  justify-content: space-between;
-  padding-block: 8px;
-  padding-inline: var(--spacing-padding-x);
-}
-.footer > div {
-  align-items: center;
-  display: flex;
-  gap: 4px;
-}
-.footer button {
-  --color-accent: hsl(284, 0%, 25%);
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--color-accent) 20%, transparent),
-    color-mix(in srgb, var(--color-accent) 6%, transparent)
-  );
-
-  align-items: center;
-  appearance: none;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
-  display: flex;
-  font-size: 14px;
-  gap: 6px;
-  outline: none;
-  padding-block: 6px;
-  padding-inline: 8px;
-  transition: background 90ms linear, border-color 90ms linear;
-}
-.footer button:hover {
-  --color-accent: hsl(284, 0%, 33%);
-}
-.footer button:where([data-active]) {
-  --color-accent: hsl(265, 100%, 60%);
-}
-.footer button:where([data-active]):hover {
-  --color-accent: hsl(265, 100%, 67%);
-}
-.footer button svg {
-  color: color-mix(in srgb, var(--color-text) 50%, var(--color-accent));
-  display: block;
-  flex-shrink: 0;
-  opacity: 0.67;
-  transition: color 90ms linear;
-}
-.footer button:where([data-active]) span {
-  color: color-mix(in srgb, var(--color-text) 67%, var(--color-accent));
-  transition: color 90ms linear;
+.container {
+  border-bottom: none;
 }

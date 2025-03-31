@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,173 +17,156 @@ import (
 
 var _ Model = (*deepSeekModel)(nil)
 
-type deepSeekModelPersonality struct {
-	id           string
-	name         string
-	systemPrompt string
-}
-
 type deepSeekModel struct {
-	id            string
-	apiKey        string
-	modelName     string
-	displayName   string
-	personalities []deepSeekModelPersonality
+	*model
+	id        string
+	apiKey    string
+	modelName string
 }
 
-type deepSeekModelOption func(*deepSeekModel)
-
-func WithDeepSeekModelDisplayName(name string) deepSeekModelOption {
-	return func(m *deepSeekModel) {
-		m.displayName = name
+func NewDeepSeekModel(apiKey string, modelName string, opts ...modelOption) *deepSeekModel {
+	m := &deepSeekModel{
+		model:     &model{displayName: modelName},
+		apiKey:    apiKey,
+		modelName: modelName,
 	}
-}
-
-func WithDeepSeekModelPersonality(name string, systemPrompt string) deepSeekModelOption {
-	return func(m *deepSeekModel) {
-		id := xxhash.New()
-		util.Must(id.WriteString("deepseek"))
-		util.Must(id.WriteString("personality"))
-		util.Must(id.WriteString(m.id))
-		util.Must(id.WriteString(m.displayName))
-		util.Must(id.WriteString(name))
-		m.personalities = append(m.personalities, deepSeekModelPersonality{
-			id:           strconv.FormatUint(id.Sum64(), 10),
-			name:         name,
-			systemPrompt: systemPrompt,
-		})
+	for _, opt := range opts {
+		opt(m.model)
 	}
-}
-
-func NewDeepSeekModel(apiKey string, modelName string, opts ...deepSeekModelOption) *deepSeekModel {
 	id := xxhash.New()
 	util.Must(id.WriteString("deepseek"))
 	util.Must(id.WriteString(modelName))
-	m := &deepSeekModel{
-		apiKey:        apiKey,
-		modelName:     modelName,
-		displayName:   modelName,
-		personalities: []deepSeekModelPersonality{},
-	}
-	for _, opt := range opts {
-		opt(m)
-	}
 	util.Must(id.WriteString(m.displayName))
 	m.id = "deepseek_" + strconv.FormatUint(id.Sum64(), 10)
 	return m
 }
 
 func (m *deepSeekModel) GetModelInfo() ModelInfo {
-	personalities := make([]ModelPersonality, len(m.personalities))
-	for i, p := range m.personalities {
-		personalities[i] = ModelPersonality{
-			ID:           p.id,
-			Name:         p.name,
-			SystemPrompt: p.systemPrompt,
-		}
-	}
-	return ModelInfo{
-		ID:            m.id,
-		Name:          m.displayName,
-		Personalities: personalities,
-	}
+	return m.getModelInfo(m.id)
 }
 
-func (m *deepSeekModel) StreamCompletion(ctx context.Context, systemPrompt string, history []ChatEvent, _ CompletionOpts) <-chan ChatEvent {
-	out := make(chan ChatEvent)
-	go func() {
-		defer close(out)
-		chunks := callOpenAICompatibleAPI(ctx,
-			func(ctx context.Context) (*http.Response, error) {
-				type reqBodyMessage struct {
-					Role    string `json:"role"`
-					Content string `json:"content"`
-				}
-				type reqBody struct {
-					MaxTokens int              `json:"max_tokens"`
-					Messages  []reqBodyMessage `json:"messages"`
-					Model     string           `json:"model"`
-					Stream    bool             `json:"stream"`
-				}
-				b := reqBody{
-					MaxTokens: 8000,
-					Messages:  make([]reqBodyMessage, 0),
-					Model:     m.modelName,
-					Stream:    true,
-				}
-				if systemPrompt != "" {
-					loc, _ := time.LoadLocation("Europe/Helsinki")
-					now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
-					b.Messages = append(b.Messages, reqBodyMessage{
-						Role:    "system",
-						Content: strings.ReplaceAll(systemPrompt, "{{current_time}}", now),
-					})
-				}
-				for _, i := range history {
-					switch i := i.(type) {
-					case *AssistantMessageChatEvent:
-						b.Messages = append(b.Messages, reqBodyMessage{
-							Role:    "assistant",
-							Content: i.content,
-						})
-					case *UserMessageChatEvent:
-						b.Messages = append(b.Messages, reqBodyMessage{
-							Role:    "user",
-							Content: i.content,
-						})
-					}
-				}
-				var buf bytes.Buffer
-				enc := json.NewEncoder(&buf)
-				enc.SetEscapeHTML(false)
-				if err := enc.Encode(b); err != nil {
-					return nil, err
-				}
-				req, err := http.NewRequestWithContext(ctx,
-					http.MethodPost, "https://api.deepseek.com/v1/chat/completions",
-					&buf,
-				)
-				if err != nil {
-					return nil, err
-				}
-				req.Header.Set("Authorization", "Bearer "+m.apiKey)
-				req.Header.Set("Content-Type", "application/json")
-				return http.DefaultClient.Do(req)
-			},
-		)
-		resp := NewAssistantMessageChatEvent("")
-		out <- resp
-		for r := range chunks {
-			if r.Err != nil {
-				fmt.Printf("error: %v\n", r.Err)
-				return
+func (m *deepSeekModel) StreamCompletion(
+	ctx context.Context, history []Message, opts GenerationConfig,
+) <-chan Result[Message] {
+	out := make(chan Result[Message], 1)
+	defer close(out)
+	resp, err := m.request(ctx, history, opts)
+	if err != nil {
+		out <- Err[Message](err)
+		return out
+	}
+	return streamOpenAI(resp)
+}
+
+func (m *deepSeekModel) request(
+	ctx context.Context, history []Message, opts GenerationConfig,
+) (*http.Response, error) {
+	type reqBody_toolCall_function struct {
+		Name string `json:"name"`
+		Args string `json:"arguments"`
+	}
+	type reqBody_toolCall struct {
+		ID       string                    `json:"id"`
+		Type     string                    `json:"type"`
+		Function reqBody_toolCall_function `json:"function"`
+	}
+	type reqBody_message struct {
+		Role       string             `json:"role"`
+		Content    string             `json:"content"`
+		ToolCalls  []reqBody_toolCall `json:"tool_calls,omitempty"`
+		ToolCallID string             `json:"tool_call_id,omitempty"`
+	}
+	type reqBody struct {
+		MaxTokens   int64             `json:"max_tokens,omitempty"`
+		Messages    []reqBody_message `json:"messages"`
+		Model       string            `json:"model"`
+		Stream      bool              `json:"stream"`
+		Temperature float64           `json:"temperature"`
+	}
+	b := reqBody{
+		MaxTokens:   m.maxTokens,
+		Messages:    []reqBody_message{},
+		Model:       m.modelName,
+		Stream:      true,
+		Temperature: m.temperature,
+	}
+	if opts.Temperature != nil {
+		b.Temperature = *opts.Temperature
+	}
+	for _, i := range history {
+		switch i := i.(type) {
+		case *SystemMessage:
+			loc, _ := time.LoadLocation("Europe/Helsinki")
+			now := time.Now().In(loc).Format("Monday 2006-01-02 15:04:05")
+			systemPrompt := strings.ReplaceAll(i.Content, "{{current_time}}", now)
+			b.Messages = append(b.Messages, reqBody_message{
+				Role:    "system",
+				Content: systemPrompt,
+			})
+		case *AssistantMessage:
+			msg := reqBody_message{
+				Role:    "assistant",
+				Content: i.Content,
 			}
-			type respBody struct {
-				Model   string `json:"model"`
-				Choices []struct {
-					Delta struct {
-						Content          *string `json:"content"`
-						ReasoningContent *string `json:"reasoning_content"`
-					} `json:"delta"`
-				} `json:"choices"`
+			for _, t := range i.ToolCalls {
+				msg.ToolCalls = append(msg.ToolCalls, reqBody_toolCall{
+					ID:   t.CallID,
+					Type: "function",
+					Function: reqBody_toolCall_function{
+						Name: t.FuncName,
+						Args: t.FuncArgs,
+					},
+				})
 			}
-			var b respBody
-			if err := json.Unmarshal([]byte(r.Val), &b); err != nil {
-				fmt.Printf("error: %v\n", err)
-				return
+			b.Messages = append(b.Messages, msg)
+		case *ToolMessage:
+			msg := reqBody_message{
+				Role:       "tool",
+				ToolCallID: i.CallID,
 			}
-			if len(b.Choices) == 0 {
-				return
+			if i.Error != nil {
+				msg.Content = fmt.Sprintf("Error: %s", i.Error.Message)
+			} else {
+				msg.Content = *i.Result
 			}
-			if b.Choices[0].Delta.ReasoningContent != nil {
-				resp.reasoning += *b.Choices[0].Delta.ReasoningContent
-				out <- resp
+			b.Messages = append(b.Messages, msg)
+		case *UserMessage:
+			if len(b.Messages) > 0 && b.Messages[len(b.Messages)-1].Role == "user" {
+				b.Messages[len(b.Messages)-1].Content += "\n\n" + i.Content
+				continue
 			}
-			if b.Choices[0].Delta.Content != nil {
-				resp.content += *b.Choices[0].Delta.Content
-				out <- resp
-			}
+			b.Messages = append(b.Messages, reqBody_message{
+				Role:    "user",
+				Content: i.Content,
+			})
 		}
-	}()
-	return out
+	}
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(b); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx,
+		http.MethodPost, "https://api.deepseek.com/v1/chat/completions", &buf)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+m.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		if err := resp.Body.Close(); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, body)
+	}
+	return resp, nil
 }

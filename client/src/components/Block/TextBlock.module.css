@@ -93,6 +93,9 @@
 .content p {
   margin-block: var(--gap-md);
 }
+.content li p {
+  margin-block: var(--gap-sm);
+}
 .content h1 + p,
 .content h2 + p,
 .content h3 + p,
@@ -123,6 +126,10 @@
 }
 .content div:has(> pre) {
   margin-block: var(--gap-md);
+}
+.content ul div:has(> pre),
+.content ol div:has(> pre) {
+  margin-block: 0px;
 }
 .content div > pre {
   margin-block: 0px;
@@ -214,6 +221,14 @@
   white-space: nowrap;
 }
 /* math */
+.content :global(.katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 4px;
+}
+.content :global(.katex-display)::-webkit-scrollbar {
+  display: none;
+}
 .content p :global(.katex) {
   font-size: 1.1em;
 }
@@ -234,41 +249,60 @@
   padding-inline: 4px;
 }
 /* code blocks */
-.content div:has(> pre) > div:first-child {
-  align-items: center;
-  display: flex;
-  padding-block-end: 2px;
+.content [data-el="pre"] {
+  background: var(--color-bg-tertiary);
+  border-radius: 12px;
+  border: 1px solid var(--color-border-tertiary);
+  margin-inline: calc(-1 * var(--spacing-padding-x));
 }
-.content div:has(> pre) > div:first-child span {
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+.content ul [data-el="pre"],
+.content ol [data-el="pre"] {
+  margin-inline: 0px;
+}
+.content [data-el="pre"] > div {
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-tertiary);
+  display: flex;
+  justify-content: space-between;
+  padding-block: 6px;
+  padding-inline: var(--spacing-padding-x);
+}
+.content [data-el="pre"] > div span {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
   font-family: "JetBrains Mono", monospace;
   font-size: 13px;
-  letter-spacing: initial;
+  letter-spacing: -0.02em;
   line-height: 1.2;
 }
-.content div:has(> pre) > div:first-child button {
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
-  margin-inline-start: -4px;
-  margin-inline-end: 2px;
-  padding: 4px;
+.content [data-el="pre"] > div button {
+  color: color-mix(in srgb, var(--color-text) 33%, transparent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  padding-block: 4px;
+  padding-inline: 0px;
   transition: color 90ms linear;
 }
-.content div:has(> pre) > div:first-child button:hover {
+.content [data-el="pre"] > div button:hover {
   color: var(--color-text);
 }
 .content pre {
   appearance: none;
-  background: color-mix(in srgb, var(--color-text) 4%, transparent) !important;
+  background: transparent !important;
   font-size: 13px;
-  margin-inline: calc(-1 * var(--spacing-padding-x));
+  line-height: 1.5;
+  margin: 0px;
   overflow-x: auto;
-  padding-block: 12px;
+  padding-block: var(--spacing-padding-x);
   padding-inline: var(--spacing-padding-x);
-  position: relative;
+}
+.content pre::-webkit-scrollbar {
+  display: none;
 }
 .content pre > code {
   font-family: "JetBrains Mono", monospace;
-  font-size: 13px;
-  letter-spacing: initial;
-  line-height: 1.4;
+  font-size: inherit;
+  letter-spacing: -0.02em;
+  line-height: inherit;
 }

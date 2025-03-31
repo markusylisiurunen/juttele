@@ -1,0 +1,29 @@
+.button {
+  --size: 32px;
+}
+.button {
+  align-items: center;
+  appearance: none;
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  border-radius: calc(var(--size) / 2);
+  border: 1px solid color-mix(in srgb, var(--color-text) 4%, transparent);
+  color: color-mix(in srgb, var(--color-text) 67%, transparent);
+  flex: 0 0 auto;
+  gap: 3px;
+  height: var(--size);
+  padding-block: 0px;
+  padding-inline: 8px;
+  transition: background 90ms linear, border 90ms linear, color 90ms linear;
+}
+.glowing {
+  background: var(--color-bg-glow);
+  border-color: var(--color-border-glow);
+  color: var(--color-text-glow);
+}
+.button svg {
+  opacity: 0.5;
+}
+.button span {
+  display: inline-block;
+  white-space: nowrap;
+}

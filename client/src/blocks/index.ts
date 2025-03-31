@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { ErrorBlock } from "./error";
 import { TextBlock } from "./text";
 import { ThinkingBlock } from "./thinking";
-import { ToolCallBlock } from "./tool-call";
+import { ToolBlock } from "./tool";
 
-const AnyBlock = z.union([TextBlock, ToolCallBlock, ThinkingBlock]);
+const AnyBlock = z.union([ErrorBlock, TextBlock, ToolBlock, ThinkingBlock]);
 type AnyBlock = z.infer<typeof AnyBlock>;
 
-export { AnyBlock, TextBlock, ThinkingBlock, ToolCallBlock };
+export { AnyBlock, ErrorBlock, TextBlock, ThinkingBlock, ToolBlock };
