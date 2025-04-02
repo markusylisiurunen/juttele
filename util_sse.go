@@ -78,6 +78,7 @@ func streamAnthropic(resp *http.Response) <-chan Result[Message] {
 			Type        string `json:"type"`
 			Text        string `json:"text"`
 			Thinking    string `json:"thinking"`
+			Signature   string `json:"signature"`
 			PartialJSON string `json:"partial_json"`
 		} `json:"delta"`
 	}
@@ -141,6 +142,10 @@ func streamAnthropic(resp *http.Response) <-chan Result[Message] {
 				}
 				if b.Delta.Thinking != "" {
 					msg.AppendThinking(b.Delta.Thinking)
+					out <- Ok[Message](msg)
+				}
+				if b.Delta.Signature != "" {
+					msg.SetTransientMeta("signature", b.Delta.Signature)
 					out <- Ok[Message](msg)
 				}
 				if b.Delta.Text != "" {

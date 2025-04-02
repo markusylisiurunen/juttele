@@ -19,15 +19,18 @@ const (
 type Message interface {
 	GetID() string
 	GetType() MessageType
-	SetMeta(key, value string)
-	GetMeta(key string) (string, bool)
+	SetTransientMeta(key, value string)
+	GetTransientMeta(key string) (string, bool)
+	SetPersistedMeta(key, value string)
+	GetPersistedMeta(key string) (string, bool)
 	MarshalJSON() ([]byte, error)
 }
 
 type BaseMessage struct {
-	ID   string            `json:"id"`
-	Type MessageType       `json:"type"`
-	Meta map[string]string `json:"meta,omitempty"`
+	ID            string            `json:"id"`
+	Type          MessageType       `json:"type"`
+	PersistedMeta map[string]string `json:"meta,omitempty"`
+	TransientMeta map[string]string `json:"-"`
 }
 
 func newBaseMessage(messageType MessageType) BaseMessage {
@@ -45,18 +48,33 @@ func (m *BaseMessage) GetType() MessageType {
 	return m.Type
 }
 
-func (m *BaseMessage) SetMeta(key, value string) {
-	if m.Meta == nil {
-		m.Meta = make(map[string]string)
+func (m *BaseMessage) SetTransientMeta(key, value string) {
+	if m.TransientMeta == nil {
+		m.TransientMeta = make(map[string]string)
 	}
-	m.Meta[key] = value
+	m.TransientMeta[key] = value
 }
 
-func (m *BaseMessage) GetMeta(key string) (string, bool) {
-	if m.Meta == nil {
+func (m *BaseMessage) GetTransientMeta(key string) (string, bool) {
+	if m.TransientMeta == nil {
 		return "", false
 	}
-	value, ok := m.Meta[key]
+	value, ok := m.TransientMeta[key]
+	return value, ok
+}
+
+func (m *BaseMessage) SetPersistedMeta(key, value string) {
+	if m.PersistedMeta == nil {
+		m.PersistedMeta = make(map[string]string)
+	}
+	m.PersistedMeta[key] = value
+}
+
+func (m *BaseMessage) GetPersistedMeta(key string) (string, bool) {
+	if m.PersistedMeta == nil {
+		return "", false
+	}
+	value, ok := m.PersistedMeta[key]
 	return value, ok
 }
 

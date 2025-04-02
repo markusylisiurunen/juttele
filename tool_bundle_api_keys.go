@@ -3,6 +3,7 @@ package juttele
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -68,7 +69,8 @@ func (m *apiKeyToolBundle) createAPIKey() Tool {
 			if err != nil {
 				return "", err
 			}
-			return apiKeyUUID, nil
+			out, err := json.Marshal(map[string]any{"api_key": apiKeyUUID})
+			return string(out), err
 		},
 	)
 }

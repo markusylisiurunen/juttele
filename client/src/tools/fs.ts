@@ -26,7 +26,7 @@ function makeListFilesTool(baseDir: string): Tool {
       if (files.length === 0) {
         return "No git-tracked files found.";
       }
-      return files.join("\n");
+      return JSON.stringify(files);
     },
   };
 }
@@ -63,7 +63,7 @@ function makeReadFileTool(baseDir: string): Tool {
       }
       await assertGitRoot(baseDir);
       const content = await readFileContent(baseDir, filePath);
-      return content;
+      return JSON.stringify({ content: content });
     },
   };
 }
@@ -109,7 +109,7 @@ function makeWriteFileTool(baseDir: string): Tool {
       }
       await assertGitRoot(baseDir);
       await writeFileContent(baseDir, filePath, content);
-      return "File written successfully.";
+      return JSON.stringify({ ok: true });
     },
   };
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,8 +50,6 @@ func (m *anthropicModel) GetModelInfo() ModelInfo {
 func (m *anthropicModel) StreamCompletion(
 	ctx context.Context, history []Message, opts GenerationConfig,
 ) <-chan Result[Message] {
-	out := make(chan Result[Message], 1)
-	defer close(out)
 	if opts.Think {
 		if opts.Tools == nil {
 			opts.Tools = NewToolCatalog()
@@ -60,10 +57,6 @@ func (m *anthropicModel) StreamCompletion(
 			opts.Tools = opts.Tools.Copy()
 		}
 		m.injectThinkTool(opts.Tools)
-	}
-	if opts.Tools != nil && opts.Tools.Count() > 0 && opts.Think {
-		out <- Err[Message](errors.New("tools cannot be used with extended thinking for now"))
-		return out
 	}
 	copied := make([]Message, len(history))
 	copy(copied, history)
@@ -110,6 +103,11 @@ func (m *anthropicModel) injectThinkTool(tools *ToolCatalog) {
 func (m *anthropicModel) request(
 	ctx context.Context, history []Message, opts GenerationConfig,
 ) (*http.Response, error) {
+	type reqBody_message_thinking struct {
+		Type      string `json:"type"`
+		Thinking  string `json:"thinking"`
+		Signature string `json:"signature"`
+	}
 	type reqBody_message_text struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
@@ -172,6 +170,7 @@ func (m *anthropicModel) request(
 			b.Tools = append(b.Tools, spec)
 		}
 	}
+	thinkingSignatureSeen := false
 	for _, i := range history {
 		switch i := i.(type) {
 		case *SystemMessage:
@@ -180,10 +179,21 @@ func (m *anthropicModel) request(
 			systemPrompt := strings.ReplaceAll(i.Content, "{{current_time}}", now)
 			b.System = &systemPrompt
 		case *AssistantMessage:
-			content := []any{reqBody_message_text{
+			content := []any{}
+			if signature, _ := i.GetTransientMeta("signature"); i.Thinking != "" && signature != "" {
+				if !thinkingSignatureSeen {
+					thinkingSignatureSeen = true
+					content = append(content, reqBody_message_thinking{
+						Type:      "thinking",
+						Thinking:  i.Thinking,
+						Signature: signature,
+					})
+				}
+			}
+			content = append(content, reqBody_message_text{
 				Type: "text",
 				Text: i.Content,
-			}}
+			})
 			for _, t := range i.ToolCalls {
 				content = append(content, reqBody_message_toolUse{
 					Type:  "tool_use",
