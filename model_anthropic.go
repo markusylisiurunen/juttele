@@ -148,8 +148,8 @@ func (m *anthropicModel) request(
 		Stream:      true,
 		Temperature: m.temperature,
 	}
-	if b.MaxTokens == 0 {
-		b.MaxTokens = 16384
+	if opts.MaxTokens > 0 {
+		b.MaxTokens = opts.MaxTokens
 	}
 	if opts.Temperature != nil {
 		b.Temperature = *opts.Temperature

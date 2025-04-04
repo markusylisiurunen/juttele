@@ -76,12 +76,16 @@ func (m *deepSeekModel) request(
 		ToolCalls  []reqBody_toolCall `json:"tool_calls,omitempty"`
 		ToolCallID string             `json:"tool_call_id,omitempty"`
 	}
+	type reqBody_responseFormat struct {
+		Type string `json:"type"`
+	}
 	type reqBody struct {
-		MaxTokens   int64             `json:"max_tokens,omitempty"`
-		Messages    []reqBody_message `json:"messages"`
-		Model       string            `json:"model"`
-		Stream      bool              `json:"stream"`
-		Temperature float64           `json:"temperature"`
+		MaxTokens      int64                   `json:"max_tokens,omitempty"`
+		Messages       []reqBody_message       `json:"messages"`
+		Model          string                  `json:"model"`
+		ResponseFormat *reqBody_responseFormat `json:"response_format,omitempty"`
+		Stream         bool                    `json:"stream"`
+		Temperature    float64                 `json:"temperature"`
 	}
 	b := reqBody{
 		MaxTokens:   m.maxTokens,
@@ -90,8 +94,16 @@ func (m *deepSeekModel) request(
 		Stream:      true,
 		Temperature: m.temperature,
 	}
+	if opts.MaxTokens > 0 {
+		b.MaxTokens = opts.MaxTokens
+	}
 	if opts.Temperature != nil {
 		b.Temperature = *opts.Temperature
+	}
+	if opts.JSON {
+		b.ResponseFormat = &reqBody_responseFormat{
+			Type: "json_object",
+		}
 	}
 	for _, i := range history {
 		switch i := i.(type) {

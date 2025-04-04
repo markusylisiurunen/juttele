@@ -21,6 +21,8 @@ type ModelInfo struct {
 }
 
 type GenerationConfig struct {
+	JSON        bool
+	MaxTokens   int64
 	Temperature *float64
 	Think       bool
 	Tools       *ToolCatalog

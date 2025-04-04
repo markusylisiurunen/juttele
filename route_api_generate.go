@@ -15,6 +15,8 @@ type apiGenerateRequest_Message struct {
 	Content string `json:"content"`
 }
 type apiGenerateRequest_GenerationConfig struct {
+	JSON        *bool    `json:"json"`
+	MaxTokens   *int64   `json:"max_tokens"`
 	Temperature *float64 `json:"temperature"`
 	Think       *bool    `json:"think"`
 }
@@ -39,6 +41,10 @@ func (app *App) apiGenerateRouteHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	if request.Model.ID == "" && request.Model.Name == "" {
 		http.Error(w, "model ID or name is required", http.StatusBadRequest)
+		return
+	}
+	if request.GenerationConfig.MaxTokens != nil && *request.GenerationConfig.MaxTokens <= 0 {
+		http.Error(w, "max_tokens must be positive", http.StatusBadRequest)
 		return
 	}
 	if request.GenerationConfig.Temperature != nil && *request.GenerationConfig.Temperature < 0 {
@@ -91,6 +97,12 @@ func (app *App) apiGenerateRouteHandler(w http.ResponseWriter, r *http.Request) 
 		Temperature: nil,
 		Think:       false,
 		Tools:       nil,
+	}
+	if request.GenerationConfig.JSON != nil {
+		generationConfig.JSON = *request.GenerationConfig.JSON
+	}
+	if request.GenerationConfig.MaxTokens != nil {
+		generationConfig.MaxTokens = *request.GenerationConfig.MaxTokens
 	}
 	if request.GenerationConfig.Temperature != nil {
 		generationConfig.Temperature = request.GenerationConfig.Temperature

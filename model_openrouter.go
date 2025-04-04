@@ -124,15 +124,19 @@ func (m *openRouterModel) request(
 		AllowFallbacks bool     `json:"allow_fallbacks"`
 		Order          []string `json:"order"`
 	}
+	type reqBody_responseFormat struct {
+		Type string `json:"type"`
+	}
 	type reqBody struct {
-		IncludeReasoning bool              `json:"include_reasoning"`
-		MaxTokens        int64             `json:"max_tokens,omitempty"`
-		Messages         []reqBody_message `json:"messages"`
-		Model            string            `json:"model"`
-		Provider         *reqBody_provider `json:"provider,omitempty"`
-		Stream           bool              `json:"stream"`
-		Temperature      float64           `json:"temperature"`
-		Tools            []reqBody_tool    `json:"tools,omitempty"`
+		IncludeReasoning bool                    `json:"include_reasoning"`
+		MaxTokens        int64                   `json:"max_tokens,omitempty"`
+		Messages         []reqBody_message       `json:"messages"`
+		Model            string                  `json:"model"`
+		Provider         *reqBody_provider       `json:"provider,omitempty"`
+		ResponseFormat   *reqBody_responseFormat `json:"response_format,omitempty"`
+		Stream           bool                    `json:"stream"`
+		Temperature      float64                 `json:"temperature"`
+		Tools            []reqBody_tool          `json:"tools,omitempty"`
 	}
 	b := reqBody{
 		IncludeReasoning: true,
@@ -148,8 +152,16 @@ func (m *openRouterModel) request(
 			Order:          m.providers,
 		}
 	}
+	if opts.MaxTokens > 0 {
+		b.MaxTokens = opts.MaxTokens
+	}
 	if opts.Temperature != nil {
 		b.Temperature = *opts.Temperature
+	}
+	if opts.JSON {
+		b.ResponseFormat = &reqBody_responseFormat{
+			Type: "json_object",
+		}
 	}
 	if opts.Tools != nil && opts.Tools.Count() > 0 {
 		for _, t := range opts.Tools.List() {
