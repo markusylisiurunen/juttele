@@ -7,7 +7,7 @@ import { AnyBlock } from "./blocks";
 import { ChatHistory, Header, MessageBox } from "./components";
 import { AppProvider } from "./contexts";
 import { useApp, useMountOnce } from "./hooks";
-import { makeListFilesTool, makeReadFileTool, makeWriteFileTool } from "./tools";
+import { makeGrepTool, makeListFilesTool, makeReadFileTool, makeWriteFileTool } from "./tools";
 import { assertNever, Atom, streamCompletion, useAtomWithSelector } from "./utils";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -68,6 +68,7 @@ const App: React.FC<AppProps> = ({ chatId, onShowChats, onReset }) => {
           [
             ...(baseFileSystemPath
               ? [
+                  makeGrepTool(baseFileSystemPath),
                   makeListFilesTool(baseFileSystemPath),
                   makeReadFileTool(baseFileSystemPath),
                   makeWriteFileTool(baseFileSystemPath),
