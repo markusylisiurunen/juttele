@@ -190,10 +190,12 @@ func (m *anthropicModel) request(
 					})
 				}
 			}
-			content = append(content, reqBody_message_text{
-				Type: "text",
-				Text: i.Content,
-			})
+			if i.Content != "" {
+				content = append(content, reqBody_message_text{
+					Type: "text",
+					Text: i.Content,
+				})
+			}
 			for _, t := range i.ToolCalls {
 				content = append(content, reqBody_message_toolUse{
 					Type:  "tool_use",
