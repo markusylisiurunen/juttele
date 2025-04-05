@@ -24,10 +24,6 @@ function makeGrepTool(baseDir: string): Tool {
             type: "string",
             description: `The regular expression pattern to search for in file contents.`,
           },
-          path: {
-            type: "string",
-            description: `The directory to search in. Defaults to the current working directory.`,
-          },
           include: {
             type: "string",
             description: `File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")`,
@@ -39,18 +35,15 @@ function makeGrepTool(baseDir: string): Tool {
     },
     Call: async (args) => {
       let pattern: string;
-      let path: string | undefined;
       let include: string | undefined;
       try {
         const parsed = z
           .object({
             pattern: z.string(),
-            path: z.string().optional(),
             include: z.string().optional(),
           })
           .parse(JSON.parse(args));
         pattern = parsed.pattern;
-        path = parsed.path;
         include = parsed.include;
       } catch (error) {
         console.error("error parsing arguments:", error);
@@ -59,8 +52,7 @@ function makeGrepTool(baseDir: string): Tool {
       try {
         await assertGitRoot(baseDir);
         // build the search path
-        const searchPath = path ? await join(baseDir, path) : baseDir;
-        const absoluteSearchPath = await resolve(await homeDir(), searchPath);
+        const absoluteSearchPath = await resolve(await homeDir(), baseDir);
         // prepare ripgrep command arguments
         const rgArgs = ["-li", pattern]; // -l: only file names, -i: case insensitive
         if (include) rgArgs.push("--glob", include);
@@ -73,10 +65,12 @@ function makeGrepTool(baseDir: string): Tool {
           throw new Error(`Error executing grep: ${output.stderr}`);
         }
         // process results
+        const nonIgnoredSet = new Set(await listNonIgnoredFiles(baseDir));
         const matches = output.stdout
           .split("\n")
           .filter((line) => line.trim().length > 0)
-          .map((line) => (line.startsWith("./") ? line.slice(2) : line));
+          .map((line) => (line.startsWith("./") ? line.slice(2) : line))
+          .filter((file) => nonIgnoredSet.has(file));
         const MAX_RESULTS = 100;
         const truncated = matches.length > MAX_RESULTS;
         const results = matches.slice(0, MAX_RESULTS);
@@ -247,20 +241,6 @@ async function listNonIgnoredFiles(baseDir: string): Promise<string[]> {
   }
   const nonEmptyFiles = output.stdout.split("\n").filter((v) => v.length > 0);
   return nonEmptyFiles;
-}
-
-function shouldSkipFile(filePath: string): boolean {
-  // prettier-ignore
-  const binaryExtensions = [
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp", // images
-    ".mp3", ".mp4", ".avi", ".mov", ".wav", // audio/video
-    ".zip", ".tar", ".gz", ".7z", ".rar", // archives
-    ".exe", ".dll", ".so", ".dylib", ".class", ".pyc", // compiled/binary
-    ".ttf", ".otf", ".woff", ".woff2", // fonts
-    ".pdf", ".doc", ".xls", // other
-  ];
-  const extension = filePath.substring(filePath.lastIndexOf(".")).toLowerCase();
-  return binaryExtensions.includes(extension);
 }
 
 async function readFileContent(baseDir: string, filePath: string): Promise<string> {
