@@ -204,6 +204,9 @@ func (m *anthropicModel) request(
 					Input: json.RawMessage(t.FuncArgs),
 				})
 			}
+			if len(content) == 0 {
+				continue
+			}
 			b.Messages = append(b.Messages, reqBody_message{
 				Role:    "assistant",
 				Content: content,

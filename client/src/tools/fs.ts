@@ -10,12 +10,15 @@ function makeEditFileTool(baseDir: string): Tool {
     Spec: {
       name: "edit_file",
       description: [
-        "Edit file contents in place.",
-        "You must provide a unique string to identify the line from which the edit starts.",
-        "You then provide the number of lines to edit.",
-        "Finally, you provide the new content that will replace the old content (range from line containing the unique string + number of lines).",
-        "The new content will replace the old content starting from the line that contains the unique string.",
-        "If the unique string is not found, the file will not be modified and an error will be returned.",
+        "Edit file contents by replacing a specific section.",
+        "The tool works as follows:",
+        "1. First, it finds the FIRST line containing your 'unique_string' (the string must exist within a single line, not across multiple lines)",
+        "2. Starting from that line, it counts 'num_lines' lines (including the first line with the unique string)",
+        "3. It replaces these exact lines with your new 'content' (which can have any number of lines)",
+        "4. Example: If 'unique_string' is found on line 10 and 'num_lines' is 3, then lines 10-12 will be replaced with your new content",
+        "5. The tool will fail if: the unique string isn't found, or if it appears in multiple lines",
+        "6. All indentation in the replacement content must be provided explicitly",
+        "7. If you encounter errors with this tool, fall back to using the 'write_file' tool to replace the entire file content",
       ].join(" "),
       parameters: {
         type: "object",
