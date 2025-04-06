@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -103,6 +104,15 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		writeWSError(proxy, fmt.Sprintf("personality with ID %q not found", v.Params.PersonalityID), nil)
 		return
 	}
+	isFirst, err := app.isFirstUserMessage(ctx, chatID)
+	if err != nil {
+		logger.Get().Error(fmt.Sprintf("error checking if first message: %v", err))
+		isFirst = false
+	}
+	var titleChan chan string
+	if isFirst {
+		titleChan = app.generateChatTitle(ctx, v.Params.Content)
+	}
 	if err := app.upsertMessage(ctx, chatID, NewUserMessage(v.Params.Content)); err != nil {
 		writeWSError(proxy, "error upserting user message", err)
 		return
@@ -143,7 +153,7 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out := model.StreamCompletion(r.Context(), history, opts)
-	out2 := app.streamBlocks(ctx, chatID, out)
+	out2 := app.streamBlocks(ctx, chatID, out, titleChan, isFirst)
 	for i := range out2 {
 		msg := jsonrpc.NewNotification("block", i)
 		if err := proxy.write(msg); err != nil {
@@ -153,7 +163,9 @@ func (app *App) sendRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app *App) streamBlocks(ctx context.Context, chatID int64, in <-chan Result[Message]) <-chan Block {
+func (app *App) streamBlocks(
+	ctx context.Context, chatID int64, in <-chan Result[Message], titleChan chan string, isFirst bool,
+) <-chan Block {
 	begin := time.Now()
 	out1 := make(chan Block)
 	go func() {
@@ -244,6 +256,19 @@ func (app *App) streamBlocks(ctx context.Context, chatID int64, in <-chan Result
 			}
 			out2 <- i
 		}
+		if isFirst && titleChan != nil {
+			title := <-titleChan
+			if title == "" {
+				logger.Get().Error("generated title is empty")
+			} else {
+				if err := app.repo.UpdateChat(ctx, repo.UpdateChatArgs{
+					ID:    chatID,
+					Title: title,
+				}); err != nil {
+					logger.Get().Error(fmt.Sprintf("error updating chat title: %v", err))
+				}
+			}
+		}
 	}()
 	return out2
 }
@@ -278,4 +303,68 @@ func (app *App) upsertChatEvent(
 		return err
 	}
 	return nil
+}
+
+func (app *App) isFirstUserMessage(ctx context.Context, chatID int64) (bool, error) {
+	events, err := app.repo.ListChatEvents(ctx, repo.ListChatEventsArgs{
+		ChatID:     chatID,
+		KindPrefix: "message.user",
+	})
+	if err != nil {
+		return false, err
+	}
+	return len(events.Items) == 0, nil
+}
+
+func (app *App) generateChatTitle(ctx context.Context, content string) chan string {
+	result := make(chan string, 1)
+	go func() {
+		defer close(result)
+		// TODO: allow setting the "small but capable" model in the config
+		titleModel := app.getSmallButCapableModel()
+		if titleModel == nil {
+			logger.Get().Error("no model found for title generation")
+			return
+		}
+		systemPrompt := "You are a helpful assistant that generates concise, descriptive titles based on the user's first chat message. " +
+			"IMPORTANT: Use sentence case, NOT title case. This means only capitalize the first word and proper nouns like names of people, places, or brands. " +
+			"Create a short chat title (max 80 characters) that captures the essence of the user's initial message and the chat's context. " +
+			"DO NOT include emojis, special characters or punctuation at the end of the title. " +
+			"Respond with just the title, no quotes or explanations. Respond in the same language as the message. " +
+			"Your response will be used directly as the chat title." +
+			"\n\nExamples of CORRECT titles (sentence case):\n" +
+			"- \"How to make a perfect omelette\" (NOT \"How To Make A Perfect Omelette\")\n" +
+			"- \"Elokuvasuosituksia draaman ystäville\" (NOT \"Elokuvasuosituksia Draaman Ystäville\")\n" +
+			"- \"Z-value spike implications\" (NOT \"Z-Value Spike Implications\")\n" +
+			"- \"Planning a trip to London\" (NOT \"Planning A Trip To London\")\n" +
+			"- \"Ways to improve productivity at work\" (NOT \"Ways To Improve Productivity At Work\")\n" +
+			"\n\nRemember: Only capitalize the first word and proper nouns. Every other word should be lowercase."
+		history := []Message{
+			NewSystemMessage(systemPrompt),
+			NewUserMessage("<initial_user_message>\n" + content + "\n<initial_user_message>"),
+		}
+		temp := 0.3
+		opts := GenerationConfig{
+			MaxTokens:   50,
+			Temperature: &temp,
+		}
+		titleStream := titleModel.StreamCompletion(ctx, history, opts)
+		var title string
+		for res := range titleStream {
+			if res.Err != nil {
+				logger.Get().Error(fmt.Sprintf("error generating title: %v", res.Err))
+				continue
+			}
+			if msg, ok := res.Val.(*AssistantMessage); ok && msg.Content != "" {
+				title = msg.Content
+			}
+		}
+		title = strings.TrimSpace(title)
+		if title == "" {
+			logger.Get().Error("generated title is empty")
+			return
+		}
+		result <- title
+	}()
+	return result
 }

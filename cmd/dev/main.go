@@ -23,6 +23,7 @@ func main() {
 		openRouterToken = os.Getenv("OPEN_ROUTER_TOKEN")
 	)
 	app := juttele.New("YOUR_TOKEN_HERE",
+		juttele.WithSmallButCapableModel("Gemini 2.0 Flash"),
 		juttele.WithModel(
 			juttele.NewAnthropicModel(anthropicToken, "claude-3-7-sonnet-20250219",
 				juttele.WithDisplayName("Claude 3.7 Sonnet"),

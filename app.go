@@ -13,8 +13,9 @@ import (
 
 type App struct {
 	// config options
-	configToken      string
-	configDataFolder string
+	configToken                string
+	configDataFolder           string
+	configSmallButCapableModel string
 
 	// runtime state
 	db     *sql.DB
@@ -29,6 +30,12 @@ type appOption func(*App)
 func WithDataFolder(folder string) appOption {
 	return func(app *App) {
 		app.configDataFolder = folder
+	}
+}
+
+func WithSmallButCapableModel(name string) appOption {
+	return func(app *App) {
+		app.configSmallButCapableModel = name
 	}
 }
 
@@ -86,6 +93,20 @@ func (app *App) ListenAndServe(ctx context.Context) error {
 }
 
 // ---
+
+func (app *App) getSmallButCapableModel() Model {
+	if len(app.configSmallButCapableModel) > 0 {
+		for _, model := range app.models {
+			if model.GetModelInfo().Name == app.configSmallButCapableModel {
+				return model
+			}
+		}
+	}
+	if len(app.models) > 0 {
+		return app.models[0]
+	}
+	return nil
+}
 
 func (app *App) initModels(ctx context.Context) error {
 	for _, model := range app.models {

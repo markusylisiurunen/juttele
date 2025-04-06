@@ -93,6 +93,9 @@ const App: React.FC<AppProps> = ({ chatId, onShowChats, onReset }) => {
       } finally {
         app.generation.set((state) => ({ ...state, generating: false }));
       }
+      // re-fetch the chat's data
+      const data = await app.api.getData();
+      app.data.set(data);
     });
   }
   function onRenameChatClick() {
