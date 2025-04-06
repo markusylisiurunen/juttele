@@ -4,6 +4,90 @@ import { ChildProcess, Command } from "@tauri-apps/plugin-shell";
 import { z } from "zod";
 import { type Tool } from "./index";
 
+function makeEditFileTool(baseDir: string): Tool {
+  return {
+    Name: "edit_file",
+    Spec: {
+      name: "edit_file",
+      description: [
+        "Edit file contents in place.",
+        "You must provide a unique string to identify the line from which the edit starts.",
+        "You then provide the number of lines to edit.",
+        "Finally, you provide the new content that will replace the old content (range from line containing the unique string + number of lines).",
+        "The new content will replace the old content starting from the line that contains the unique string.",
+        "If the unique string is not found, the file will not be modified and an error will be returned.",
+      ].join(" "),
+      parameters: {
+        type: "object",
+        properties: {
+          file_path: {
+            type: "string",
+            description: "The relative path to the file to read.",
+          },
+          unique_string: {
+            type: "string",
+            description: "A unique string to identify the first line to edit.",
+          },
+          num_lines: {
+            type: "integer",
+            description: "The number of lines to replace with the new content.",
+          },
+          content: {
+            type: "string",
+            description: "The new content to write to the file starting from the unique string.",
+          },
+        },
+        required: ["file_path", "unique_string", "num_lines", "content"],
+        additionalProperties: false,
+      },
+    },
+    Call: async (args) => {
+      let filePath: string;
+      let uniqueString: string;
+      let numLines: number;
+      let content: string;
+      try {
+        const parsed = z
+          .object({
+            file_path: z.string(),
+            unique_string: z.string(),
+            num_lines: z.number().int(),
+            content: z.string(),
+          })
+          .parse(JSON.parse(args));
+        filePath = parsed.file_path;
+        uniqueString = parsed.unique_string;
+        numLines = parsed.num_lines;
+        content = parsed.content;
+      } catch (error) {
+        console.error("error parsing arguments:", error);
+        throw new Error("Error parsing arguments.");
+      }
+      await assertGitRoot(baseDir);
+      const fileContent = await readFileContent(baseDir, filePath);
+      const lines = fileContent.split("\n");
+      const linesHavingUniqueString = lines.filter((line) => line.includes(uniqueString));
+      if (linesHavingUniqueString.length === 0) {
+        console.error("unique string not found in file");
+        throw new Error("Unique string not found in file.");
+      }
+      if (linesHavingUniqueString.length > 1) {
+        console.error("multiple lines found with the unique string");
+        throw new Error("Multiple lines found with the unique string.");
+      }
+      const lineIndex = lines.indexOf(linesHavingUniqueString[0]);
+      const startIndex = Math.max(0, lineIndex);
+      const endIndex = Math.min(lines.length, lineIndex + numLines);
+      const newLines = lines
+        .slice(0, startIndex)
+        .concat(content.split("\n"), lines.slice(endIndex));
+      const newContent = newLines.join("\n");
+      await writeFileContent(baseDir, filePath, newContent);
+      return JSON.stringify({ ok: true, edited_content: newContent });
+    },
+  };
+}
+
 function makeGrepTool(baseDir: string): Tool {
   return {
     Name: "grep",
@@ -169,7 +253,7 @@ function makeWriteFileTool(baseDir: string): Tool {
         properties: {
           file_path: {
             type: "string",
-            description: "The relative path to the file to read.",
+            description: "The relative path to the file to write.",
           },
           content: {
             type: "string",
@@ -200,7 +284,7 @@ function makeWriteFileTool(baseDir: string): Tool {
   };
 }
 
-export { makeGrepTool, makeListFilesTool, makeReadFileTool, makeWriteFileTool };
+export { makeEditFileTool, makeGrepTool, makeListFilesTool, makeReadFileTool, makeWriteFileTool };
 
 //---
 
