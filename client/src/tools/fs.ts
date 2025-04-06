@@ -19,6 +19,7 @@ function makeEditFileTool(baseDir: string): Tool {
         "5. The tool will fail if: the unique string isn't found, or if it appears in multiple lines",
         "6. All indentation in the replacement content must be provided explicitly",
         "7. If you encounter errors with this tool, fall back to using the 'write_file' tool to replace the entire file content",
+        '8. Example usage: Original file contains: function hello() {\\n  console.log("Hello");\\n  console.log("World");\\n  return true;\\n}. Using edit_file with unique_string="console.log(\\"Hello\\")" and num_lines=2 and content="  console.log(\\"Hello, World!\\");" would result in: function hello() {\\n  console.log("Hello, World!");\\n  return true;\\n}',
       ].join(" "),
       parameters: {
         type: "object",
