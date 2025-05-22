@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -50,14 +51,14 @@ func (m *anthropicModel) GetModelInfo() ModelInfo {
 func (m *anthropicModel) StreamCompletion(
 	ctx context.Context, history []Message, opts GenerationConfig,
 ) <-chan Result[Message] {
-	if opts.Think {
-		if opts.Tools == nil {
-			opts.Tools = NewToolCatalog()
-		} else {
-			opts.Tools = opts.Tools.Copy()
-		}
-		m.injectThinkTool(opts.Tools)
-	}
+	// if opts.Think {
+	// 	if opts.Tools == nil {
+	// 		opts.Tools = NewToolCatalog()
+	// 	} else {
+	// 		opts.Tools = opts.Tools.Copy()
+	// 	}
+	// 	m.injectThinkTool(opts.Tools)
+	// }
 	copied := make([]Message, len(history))
 	copy(copied, history)
 	return streamWithTools(ctx, opts.Tools, &copied, func() <-chan Result[Message] {
@@ -73,32 +74,34 @@ func (m *anthropicModel) StreamCompletion(
 }
 
 func (m *anthropicModel) isThinkingModel() bool {
-	return strings.Contains(m.modelName, "claude-3-7-sonnet")
+	return strings.Contains(m.modelName, "claude-3-7-sonnet") ||
+		strings.Contains(m.modelName, "claude-sonnet-4") ||
+		strings.Contains(m.modelName, "claude-opus-4")
 }
 
-func (m *anthropicModel) injectThinkTool(tools *ToolCatalog) {
-	var spec = `
-{
-	"name": "think",
-	"description": "Use the tool to think about something. It will not obtain new information or make any changes to the repository, but just log the thought. Use it when complex reasoning or brainstorming is needed. For example, if you explore the repo and discover the source of a bug, call this tool to brainstorm several unique ways of fixing the bug, and assess which change(s) are likely to be simplest and most effective. Alternatively, if you receive some test results, call this tool to brainstorm ways to fix the failing tests.",
-	"parameters": {
-		"type": "object",
-		"properties": {
-			"thought": {
-				"type": "string",
-				"description": "Your thoughts."
-			}
-		},
-		"required": ["thought"]
-	}
-}
-	`
-	tools.Register(newFuncTool(
-		"think",
-		[]byte(strings.TrimSpace(spec)),
-		func(ctx context.Context, args string) (string, error) { return "", nil },
-	))
-}
+// func (m *anthropicModel) injectThinkTool(tools *ToolCatalog) {
+// 	var spec = `
+// {
+// 	"name": "think",
+// 	"description": "Use the tool to think about something. It will not obtain new information or make any changes to the repository, but just log the thought. Use it when complex reasoning or brainstorming is needed. For example, if you explore the repo and discover the source of a bug, call this tool to brainstorm several unique ways of fixing the bug, and assess which change(s) are likely to be simplest and most effective. Alternatively, if you receive some test results, call this tool to brainstorm ways to fix the failing tests.",
+// 	"parameters": {
+// 		"type": "object",
+// 		"properties": {
+// 			"thought": {
+// 				"type": "string",
+// 				"description": "Your thoughts."
+// 			}
+// 		},
+// 		"required": ["thought"]
+// 	}
+// }
+// 	`
+// 	tools.Register(newFuncTool(
+// 		"think",
+// 		[]byte(strings.TrimSpace(spec)),
+// 		func(ctx context.Context, args string) (string, error) { return "", nil },
+// 	))
+// }
 
 func (m *anthropicModel) request(
 	ctx context.Context, history []Message, opts GenerationConfig,
@@ -158,7 +161,7 @@ func (m *anthropicModel) request(
 		b.Temperature = 1.0 // NOTE: Anthropic does not support temperature for extended thinking
 		b.Thinking = &reqBody_thinking{
 			Type:         "enabled",
-			BudgetTokens: 8192, // TODO: make this configurable
+			BudgetTokens: min(16384, int64(math.Round(0.8*float64(b.MaxTokens)))),
 		}
 	}
 	if opts.Tools != nil && opts.Tools.Count() > 0 {
