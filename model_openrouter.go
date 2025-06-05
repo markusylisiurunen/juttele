@@ -124,6 +124,9 @@ func (m *openRouterModel) request(
 		AllowFallbacks bool     `json:"allow_fallbacks"`
 		Order          []string `json:"order"`
 	}
+	type reqBody_Reasoning struct {
+		Effort string `json:"effort"`
+	}
 	type reqBody_responseFormat struct {
 		Type string `json:"type"`
 	}
@@ -133,6 +136,7 @@ func (m *openRouterModel) request(
 		Messages         []reqBody_message       `json:"messages"`
 		Model            string                  `json:"model"`
 		Provider         *reqBody_provider       `json:"provider,omitempty"`
+		Reasoning        *reqBody_Reasoning      `json:"reasoning,omitempty"`
 		ResponseFormat   *reqBody_responseFormat `json:"response_format,omitempty"`
 		Stream           bool                    `json:"stream"`
 		Temperature      float64                 `json:"temperature"`
@@ -143,6 +147,7 @@ func (m *openRouterModel) request(
 		MaxTokens:        m.maxTokens,
 		Messages:         []reqBody_message{},
 		Model:            m.modelName,
+		Reasoning:        &reqBody_Reasoning{Effort: "low"},
 		Stream:           true,
 		Temperature:      m.temperature,
 	}
@@ -157,6 +162,9 @@ func (m *openRouterModel) request(
 	}
 	if opts.Temperature != nil {
 		b.Temperature = *opts.Temperature
+	}
+	if opts.Think {
+		b.Reasoning = &reqBody_Reasoning{Effort: "high"}
 	}
 	if opts.JSON {
 		b.ResponseFormat = &reqBody_responseFormat{
