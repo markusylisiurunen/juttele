@@ -125,31 +125,30 @@ func (m *openRouterModel) request(
 		Order          []string `json:"order"`
 	}
 	type reqBody_Reasoning struct {
-		Effort string `json:"effort"`
+		Effort    string `json:"effort,omitzero"`
+		MaxTokens int64  `json:"max_tokens,omitzero"`
 	}
 	type reqBody_responseFormat struct {
 		Type string `json:"type"`
 	}
 	type reqBody struct {
-		IncludeReasoning bool                    `json:"include_reasoning"`
-		MaxTokens        int64                   `json:"max_tokens,omitempty"`
-		Messages         []reqBody_message       `json:"messages"`
-		Model            string                  `json:"model"`
-		Provider         *reqBody_provider       `json:"provider,omitempty"`
-		Reasoning        *reqBody_Reasoning      `json:"reasoning,omitempty"`
-		ResponseFormat   *reqBody_responseFormat `json:"response_format,omitempty"`
-		Stream           bool                    `json:"stream"`
-		Temperature      float64                 `json:"temperature"`
-		Tools            []reqBody_tool          `json:"tools,omitempty"`
+		MaxTokens      int64                   `json:"max_tokens,omitempty"`
+		Messages       []reqBody_message       `json:"messages"`
+		Model          string                  `json:"model"`
+		Provider       *reqBody_provider       `json:"provider,omitempty"`
+		Reasoning      *reqBody_Reasoning      `json:"reasoning,omitempty"`
+		ResponseFormat *reqBody_responseFormat `json:"response_format,omitempty"`
+		Stream         bool                    `json:"stream"`
+		Temperature    float64                 `json:"temperature"`
+		Tools          []reqBody_tool          `json:"tools,omitempty"`
 	}
 	b := reqBody{
-		IncludeReasoning: true,
-		MaxTokens:        m.maxTokens,
-		Messages:         []reqBody_message{},
-		Model:            m.modelName,
-		Reasoning:        &reqBody_Reasoning{Effort: "low"},
-		Stream:           true,
-		Temperature:      m.temperature,
+		MaxTokens:   m.maxTokens,
+		Messages:    []reqBody_message{},
+		Model:       m.modelName,
+		Reasoning:   &reqBody_Reasoning{MaxTokens: 1024},
+		Stream:      true,
+		Temperature: m.temperature,
 	}
 	if len(m.providers) > 0 {
 		b.Provider = &reqBody_provider{
