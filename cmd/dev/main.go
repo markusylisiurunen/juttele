@@ -23,7 +23,7 @@ func main() {
 		openRouterToken = os.Getenv("OPEN_ROUTER_TOKEN")
 	)
 	app := juttele.New("YOUR_TOKEN_HERE",
-		juttele.WithSmallButCapableModel("Gemini 2.0 Flash"),
+		juttele.WithSmallButCapableModel("Gemini 2.5 Flash"),
 		juttele.WithModel(
 			juttele.NewAnthropicModel(anthropicToken, "claude-3-7-sonnet-20250219",
 				juttele.WithDisplayName("Claude 3.7 Sonnet"),
@@ -57,7 +57,7 @@ func main() {
 			),
 		),
 		juttele.WithModel(
-			juttele.NewOpenRouterModel(openRouterToken, "google/gemini-2.5-pro-exp-03-25:free", []string{"Google AI Studio"},
+			juttele.NewOpenRouterModel(openRouterToken, "google/gemini-2.5-pro", []string{"Google AI Studio"},
 				juttele.WithDisplayName("Gemini 2.5 Pro"),
 				juttele.WithMaxTokens(16384),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
@@ -65,8 +65,8 @@ func main() {
 			),
 		),
 		juttele.WithModel(
-			juttele.NewOpenRouterModel(openRouterToken, "google/gemini-2.0-flash-001", []string{"Google AI Studio"},
-				juttele.WithDisplayName("Gemini 2.0 Flash"),
+			juttele.NewOpenRouterModel(openRouterToken, "google/gemini-2.5-flash", []string{"Google AI Studio"},
+				juttele.WithDisplayName("Gemini 2.5 Flash"),
 				juttele.WithMaxTokens(16384),
 				juttele.WithPersonality("Raw", rawSystemPrompt),
 				juttele.WithTemperature(1.0),
